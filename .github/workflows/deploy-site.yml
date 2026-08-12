@@ -1,0 +1,53 @@
+name: Deploy APOS read-only site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate layout JSON
+        run: node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('site/ui-layout.json','utf8'));if(!x.layoutVersion||!Array.isArray(x.sections)||!x.sections.length)throw new Error('Invalid ui-layout.json');"
+      - name: Check client JavaScript syntax
+        run: node --check site/app.js
+      - name: Reject browser-side secrets
+        run: |
+          if grep -RniE --exclude=README.md '(GITHUB_TOKEN|GATEWAY_TOKEN|APOS_CLIENT_TOKEN|APOS_GATEWAY_HMAC_SECRET)' site; then
+            echo "Secret variable detected in browser files"
+            exit 1
+          fi
+
+  deploy:
+    needs: validate
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
