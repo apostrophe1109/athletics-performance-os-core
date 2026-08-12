@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#071017">
+    <meta name="description" content="Athletics Performance OSの読み取り専用トレーニングビュー">
+    <title>Athletics Performance OS</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#dashboard">本文へ移動</a>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">APOSTROPHE / ATHLETICS PERFORMANCE OS</p>
+        <h1 id="site-title">Athletics Performance OS</h1>
+      </div>
+      <div class="connection" aria-live="polite">
+        <span id="connection-dot" class="connection__dot"></span>
+        <span id="connection-label">接続中</span>
+      </div>
+    </header>
+
+    <main id="dashboard" class="dashboard" aria-busy="true"></main>
+
+    <template id="loading-template">
+      <section class="panel skeleton-panel" aria-label="読み込み中">
+        <span class="skeleton skeleton--short"></span>
+        <span class="skeleton"></span>
+        <span class="skeleton skeleton--medium"></span>
+      </section>
+    </template>
+
+    <noscript>このサイトを表示するにはJavaScriptを有効にしてください。</noscript>
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

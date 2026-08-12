@@ -1,0 +1,84 @@
+{
+  "layoutVersion": "1.1.0",
+  "siteTitle": "Athletics Performance OS",
+  "subtitle": "18m30への練習計画と実施記録",
+  "theme": {
+    "accent": "#d8ff3e",
+    "accentSecondary": "#75e6da",
+    "surface": "#111820",
+    "background": "#071017",
+    "text": "#f3f7f9",
+    "muted": "#9fb0bc"
+  },
+  "sections": [
+    {
+      "id": "hero",
+      "type": "hero",
+      "title": "18m30への現在地",
+      "visible": true,
+      "options": {
+        "showLastSync": true,
+        "showGoal": true
+      }
+    },
+    {
+      "id": "today",
+      "type": "today",
+      "title": "今日のトレーニング",
+      "visible": true,
+      "options": {
+        "showPurpose": true,
+        "showDose": true,
+        "showStopCondition": true
+      }
+    },
+    {
+      "id": "week",
+      "type": "week",
+      "title": "今週の見通し",
+      "visible": true,
+      "options": {
+        "startOnMonday": true,
+        "days": 7
+      }
+    },
+    {
+      "id": "month",
+      "type": "month",
+      "title": "月間計画",
+      "visible": true,
+      "options": {
+        "showRole": true,
+        "showCompetition": true
+      }
+    },
+    {
+      "id": "exercise-library",
+      "type": "exerciseLibrary",
+      "title": "種目ライブラリ",
+      "visible": true,
+      "options": {
+        "limit": 12,
+        "showSearch": true
+      }
+    },
+    {
+      "id": "history",
+      "type": "history",
+      "title": "最近の実施記録",
+      "visible": true,
+      "options": {
+        "limit": 10
+      }
+    },
+    {
+      "id": "measurements",
+      "type": "measurements",
+      "title": "計測記録",
+      "visible": true,
+      "options": {
+        "limit": 8
+      }
+    }
+  ]
+}
