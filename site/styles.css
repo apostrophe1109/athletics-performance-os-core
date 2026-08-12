@@ -130,6 +130,17 @@ button, input { font: inherit; }
 .empty, .error { padding: 18px; color: var(--muted); border: 1px dashed var(--line); border-radius: 15px; line-height: 1.6; }
 .error { color: var(--danger); }
 
+.login-panel { min-height: min(520px, 68vh); display: grid; place-items: center; }
+.login-form { width: min(460px, 100%); display: grid; gap: 14px; }
+.login-form h2 { font-size: clamp(1.65rem, 4vw, 2.4rem); }
+.login-copy { margin: 0 0 8px; color: var(--muted); line-height: 1.7; }
+.login-label { color: var(--muted); font-size: .82rem; font-weight: 700; }
+.login-input { width: 100%; padding: 14px 16px; color: var(--text); border: 1px solid var(--line); border-radius: 13px; outline: none; background: rgba(0,0,0,.22); }
+.login-input:focus { border-color: var(--accent-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 13%, transparent); }
+.login-button { padding: 14px 18px; color: #071017; border: 0; border-radius: 13px; background: var(--accent); font-weight: 850; cursor: pointer; }
+.login-button:disabled { cursor: wait; opacity: .65; }
+.login-status { min-height: 1.5em; margin: 0; color: var(--danger); font-size: .86rem; line-height: 1.5; }
+
 .skeleton-panel { grid-column: span 6; display: grid; gap: 15px; }
 .skeleton { height: 18px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.13), rgba(255,255,255,.05)); background-size: 220% 100%; animation: shimmer 1.4s infinite; }
 .skeleton--short { width: 32%; }

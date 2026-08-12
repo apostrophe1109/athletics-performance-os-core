@@ -16,14 +16,18 @@ const state = {
   executions: [],
   measurements: [],
   profile: null,
-  fetchedAt: null
+  fetchedAt: null,
+  webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 
 const dashboard = document.querySelector("#dashboard");
 const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
 
-boot().catch(showFatalError);
+boot().catch(error => {
+  if (error?.code === "WEB_AUTH_REQUIRED") showLogin("セッションの有効期限が切れました。もう一度認証してください。");
+  else showFatalError(error);
+});
 
 async function boot() {
   showLoading();
@@ -32,6 +36,19 @@ async function boot() {
   document.title = state.layout.siteTitle || "Athletics Performance OS";
   document.querySelector("#site-title").textContent = state.layout.siteTitle || "Athletics Performance OS";
   assertConfigured();
+
+  if (!state.webSessionToken || !await verifyWebSession()) {
+    state.webSessionToken = "";
+    sessionStorage.removeItem("aposWebSession");
+    showLogin();
+    return;
+  }
+
+  await loadDashboardData();
+}
+
+async function loadDashboardData() {
+  showLoading();
 
   const month = monthRange(state.today);
   const [context, sessions, exercises, executions, measurements, profiles] = await Promise.all([
@@ -52,6 +69,75 @@ async function boot() {
   state.fetchedAt = new Date();
   renderDashboard();
   setConnection("ready", "最新データ");
+}
+
+async function verifyWebSession() {
+  try {
+    const result = await authRequest("/auth/verify", {});
+    return result.success === true;
+  } catch {
+    return false;
+  }
+}
+
+function showLogin(message = "") {
+  dashboard.replaceChildren();
+  dashboard.setAttribute("aria-busy", "false");
+  setConnection("idle", "本人認証が必要");
+  const panel = element("section", "panel panel--wide login-panel");
+  const form = element("form", "login-form");
+  const title = element("h2", "", "本人認証");
+  const copy = element("p", "login-copy", "Athletics Performance OSのデータを表示するには、専用パスフレーズを入力してください。");
+  const label = element("label", "login-label", "パスフレーズ");
+  label.htmlFor = "web-password";
+  const input = element("input", "login-input");
+  input.id = "web-password";
+  input.name = "password";
+  input.type = "password";
+  input.autocomplete = "current-password";
+  input.required = true;
+  const button = element("button", "login-button", "認証して表示");
+  button.type = "submit";
+  const status = element("p", "login-status", message);
+  status.setAttribute("aria-live", "polite");
+  form.append(title, copy, label, input, button, status);
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    button.disabled = true;
+    button.textContent = "認証中…";
+    status.textContent = "";
+    try {
+      const result = await authRequest("/auth/login", { password: input.value });
+      if (!result.success || !result.token) throw new Error(result.error || "認証に失敗しました。");
+      state.webSessionToken = result.token;
+      sessionStorage.setItem("aposWebSession", result.token);
+      input.value = "";
+      await loadDashboardData();
+    } catch (error) {
+      if (error?.code === "WEB_AUTH_REQUIRED") {
+        showLogin("セッションを確認できませんでした。もう一度認証してください。");
+        return;
+      }
+      status.textContent = error.message || "認証に失敗しました。";
+      input.select();
+    } finally {
+      button.disabled = false;
+      button.textContent = "認証して表示";
+    }
+  });
+  panel.append(form);
+  dashboard.append(panel);
+  input.focus();
+}
+
+async function authRequest(path, payload) {
+  const base = String(config.gatewayUrl).replace(/\/$/, "");
+  const headers = { "content-type": "application/json", "x-apos-actor": "site-read-view" };
+  if (state.webSessionToken) headers.authorization = `WebSession ${state.webSessionToken}`;
+  const response = await fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result) throw new Error(result?.error || `認証通信に失敗しました (${response.status})。`);
+  return result;
 }
 
 function assertConfigured() {
@@ -77,11 +163,20 @@ async function api(action, payload = {}) {
     const response = await fetch(`${base}/api/${encodeURIComponent(action)}`, {
       method: "POST",
       credentials: "include",
-      headers: { "content-type": "application/json", "x-apos-actor": "site-read-view" },
+      headers: {
+        "content-type": "application/json",
+        "x-apos-actor": "site-read-view",
+        "authorization": `WebSession ${state.webSessionToken}`
+      },
       body: JSON.stringify(payload),
       signal: controller.signal
     });
     const result = await response.json().catch(() => null);
+    if (response.status === 401) {
+      state.webSessionToken = "";
+      sessionStorage.removeItem("aposWebSession");
+      throw Object.assign(new Error("認証が必要です。"), { code: "WEB_AUTH_REQUIRED" });
+    }
     if (!response.ok || !result || result.success === false) {
       throw new Error(result?.error || `API ${action} が失敗しました (${response.status})。`);
     }
