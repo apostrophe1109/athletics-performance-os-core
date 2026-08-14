@@ -1,0 +1,14 @@
+{
+  "system": "Athletics Performance OS",
+  "deploymentId": "SITEDEPLOY_f9723a524b0048799660f710eebffee1",
+  "generatedAt": "2026-08-14T14:03:41.235Z",
+  "baseCommitSha": "becbb885539ae578dc095aff0d46b251d4e6ce55",
+  "changeReason": "Apps Script Deployment ScriptへDeploy後の独立Read-back Verifyを追加し、実反映確認後のみVERIFIEDとするため。",
+  "files": [
+    {
+      "path": "system/deploy_apps_script.py",
+      "operation": "UPSERT",
+      "contentHash": "6348b9c00dab577d4ef59b71020d311bfb1114128960158084d17d73d468ce55"
+    }
+  ]
+}
