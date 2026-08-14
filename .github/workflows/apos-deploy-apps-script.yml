@@ -1,0 +1,99 @@
+name: APOS Worker Manual Deployment Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "validate = 認証/構文/Cloudflare dry-runのみ（書込0） / deploy = 本番Worker Deploy"
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - deploy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apos-worker-manual-deployment
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Worker preflight (non-write)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Validate required configuration
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APOS_WORKER_NAME: ${{ vars.APOS_WORKER_NAME }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "CLOUDFLARE_API_TOKEN missing"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "CLOUDFLARE_ACCOUNT_ID missing"; exit 1; }
+          test -n "$APOS_WORKER_NAME" || { echo "APOS_WORKER_NAME missing"; exit 1; }
+          test -f system/worker.js || { echo "system/worker.js missing"; exit 1; }
+          echo "Required configuration: OK"
+
+      - name: Syntax check
+        run: node --check system/worker.js
+
+      - name: Cloudflare authentication check (read-only)
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 whoami
+
+      - name: Wrangler build dry-run (non-write)
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APOS_WORKER_NAME: ${{ vars.APOS_WORKER_NAME }}
+        run: |
+          npx --yes wrangler@4 deploy system/worker.js \
+            --name "$APOS_WORKER_NAME" \
+            --compatibility-date 2026-08-14 \
+            --keep-vars \
+            --dry-run \
+            --outdir /tmp/apos-worker-dry-run
+
+  deploy:
+    name: Deploy Worker (write)
+    needs: preflight
+    if: ${{ github.event.inputs.mode == 'deploy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            deploy system/worker.js
+            --name ${{ vars.APOS_WORKER_NAME }}
+            --compatibility-date 2026-08-14
+            --keep-vars
+
+      - name: Deployment completed
+        run: |
+          echo "Worker deployment command completed."
+          echo "Run APOS health READ-back before accepting this deployment."
