@@ -1,0 +1,172 @@
+name: APOS Apps Script Manual Deployment Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "validate = OAuth/READ/ソース一致確認のみ（書込0） / deploy = 本番Apps Script Deploy"
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - deploy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apos-apps-script-manual-deployment
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Apps Script preflight (non-write)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate OAuth, Apps Script READ, deployment READ, and source parity
+        shell: bash
+        env:
+          APOS_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.APOS_GOOGLE_OAUTH_CLIENT_ID }}
+          APOS_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.APOS_GOOGLE_OAUTH_CLIENT_SECRET }}
+          APOS_GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.APOS_GOOGLE_OAUTH_REFRESH_TOKEN }}
+          APOS_APPS_SCRIPT_PROJECT_ID: ${{ vars.APOS_APPS_SCRIPT_PROJECT_ID }}
+          APOS_APPS_SCRIPT_DEPLOYMENT_ID: ${{ vars.APOS_APPS_SCRIPT_DEPLOYMENT_ID }}
+          APOS_APPS_SCRIPT_CODE_FILE_NAME: ${{ vars.APOS_APPS_SCRIPT_CODE_FILE_NAME }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          def required(name):
+              value = os.environ.get(name, "").strip()
+              if not value:
+                  raise RuntimeError(f"{name} is required")
+              return value
+
+          client_id = required("APOS_GOOGLE_OAUTH_CLIENT_ID")
+          client_secret = required("APOS_GOOGLE_OAUTH_CLIENT_SECRET")
+          refresh_token = required("APOS_GOOGLE_OAUTH_REFRESH_TOKEN")
+          script_id = required("APOS_APPS_SCRIPT_PROJECT_ID")
+          deployment_id = required("APOS_APPS_SCRIPT_DEPLOYMENT_ID")
+          code_name = required("APOS_APPS_SCRIPT_CODE_FILE_NAME")
+
+          form = urllib.parse.urlencode({
+              "client_id": client_id,
+              "client_secret": client_secret,
+              "refresh_token": refresh_token,
+              "grant_type": "refresh_token",
+          }).encode("utf-8")
+          req = urllib.request.Request(
+              "https://oauth2.googleapis.com/token",
+              data=form,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              token_data = json.loads(resp.read().decode("utf-8"))
+          token = token_data.get("access_token")
+          if not token:
+              raise RuntimeError("OAuth refresh did not return access_token")
+
+          def get_json(url):
+              req = urllib.request.Request(
+                  url,
+                  headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                  method="GET",
+              )
+              with urllib.request.urlopen(req, timeout=45) as resp:
+                  return json.loads(resp.read().decode("utf-8"))
+
+          content = get_json(
+              "https://script.googleapis.com/v1/projects/"
+              + urllib.parse.quote(script_id)
+              + "/content"
+          )
+          files = content.get("files") or []
+          target = next(
+              (f for f in files if f.get("name") == code_name and f.get("type") == "SERVER_JS"),
+              None,
+          )
+          if target is None:
+              raise RuntimeError(f"SERVER_JS file '{code_name}' not found in live Apps Script")
+
+          deployment = get_json(
+              "https://script.googleapis.com/v1/projects/"
+              + urllib.parse.quote(script_id)
+              + "/deployments/"
+              + urllib.parse.quote(deployment_id)
+          )
+          if deployment.get("deploymentId") != deployment_id:
+              raise RuntimeError("Deployment ID READ-back mismatch")
+
+          repo_path = "system/apps-script/Code.gs"
+          if not os.path.isfile(repo_path):
+              raise RuntimeError(f"{repo_path} missing")
+          with open(repo_path, "r", encoding="utf-8") as f:
+              repo_source = f.read()
+          live_source = target.get("source") or ""
+
+          repo_hash = hashlib.sha256(repo_source.encode("utf-8")).hexdigest()
+          live_hash = hashlib.sha256(live_source.encode("utf-8")).hexdigest()
+          if repo_hash != live_hash:
+              raise RuntimeError(
+                  "LIVE_SOURCE_MISMATCH: repo system/apps-script/Code.gs does not "
+                  "exactly match live Apps Script Code source. Refusing deploy gate."
+              )
+
+          print(json.dumps({
+              "success": True,
+              "oauthRefresh": "PASS",
+              "scriptRead": "PASS",
+              "deploymentRead": "PASS",
+              "sourceParity": "PASS",
+              "codeFileName": code_name,
+              "repoSourceSha256": repo_hash,
+              "liveSourceSha256": live_hash,
+          }, ensure_ascii=False))
+          PY
+
+  deploy:
+    name: Deploy Apps Script (write)
+    needs: preflight
+    if: ${{ github.event.inputs.mode == 'deploy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Deploy approved Apps Script source
+        env:
+          APOS_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.APOS_GOOGLE_OAUTH_CLIENT_ID }}
+          APOS_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.APOS_GOOGLE_OAUTH_CLIENT_SECRET }}
+          APOS_GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.APOS_GOOGLE_OAUTH_REFRESH_TOKEN }}
+          APOS_APPS_SCRIPT_PROJECT_ID: ${{ vars.APOS_APPS_SCRIPT_PROJECT_ID }}
+          APOS_APPS_SCRIPT_DEPLOYMENT_ID: ${{ vars.APOS_APPS_SCRIPT_DEPLOYMENT_ID }}
+          APOS_APPS_SCRIPT_CODE_FILE_NAME: ${{ vars.APOS_APPS_SCRIPT_CODE_FILE_NAME }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: python system/deploy_apps_script.py
+
+      - name: Deployment completed
+        run: |
+          echo "Apps Script deployment command completed."
+          echo "Run APOS health READ-back before accepting this deployment."
