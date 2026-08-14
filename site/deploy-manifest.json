@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e630e63493034e12a2873965ba52cb53",
-  "generatedAt": "2026-08-14T22:58:42.354Z",
-  "baseCommitSha": "a451d4ea3d222027d84179bd6f7cf51450acb1a1",
-  "changeReason": "ユーザー承認済みのiPhone Air向けモバイル表示最適化を、内容変更なしで反映する。",
+  "deploymentId": "SITEDEPLOY_6110ddf2582b4a22932666ef83721b4b",
+  "generatedAt": "2026-08-14T23:20:01.656Z",
+  "baseCommitSha": "43533bd377ce23d4dadbe6b19bed566ffc7b58a1",
+  "changeReason": "ユーザーが直前の再Previewを明示承認し、iPhone Safari向けキャッシュ更新・認証タイムアウト表示修正の反映を指示したため。",
   "files": [
     {
-      "path": "site/styles.css",
+      "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "53253803004a33280f0f76f66533bf2f1dfabcc0c62eec314c01168d497e45f4"
+      "contentHash": "e97427c1f75686d89059d12aa39f3f34944b93b2bacfe5ac0c48c1eb8eace2b4"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "814aa789237ad70eba30fcba2d52500db3aac19578cc38ad770558ba299b27d6"
     }
   ]
 }

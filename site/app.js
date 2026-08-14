@@ -37,6 +37,7 @@ async function boot() {
   document.querySelector("#site-title").textContent = state.layout.siteTitle || "Athletics Performance OS";
   assertConfigured();
 
+  setConnection("idle", "認証確認中");
   if (!state.webSessionToken || !await verifyWebSession()) {
     state.webSessionToken = "";
     sessionStorage.removeItem("aposWebSession");
@@ -134,10 +135,25 @@ async function authRequest(path, payload) {
   const base = String(config.gatewayUrl).replace(/\/$/, "");
   const headers = { "content-type": "application/json", "x-apos-actor": "site-read-view" };
   if (state.webSessionToken) headers.authorization = `WebSession ${state.webSessionToken}`;
-  const response = await fetch(`${base}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
-  const result = await response.json().catch(() => null);
-  if (!response.ok || !result) throw new Error(result?.error || `認証通信に失敗しました (${response.status})。`);
-  return result;
+  const controller = new AbortController();
+  const authTimeoutMs = Math.min(Number(config.requestTimeoutMs) || 25000, 8000);
+  const timeout = setTimeout(() => controller.abort(), authTimeoutMs);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result) throw new Error(result?.error || `認証通信に失敗しました (${response.status})。`);
+    return result;
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("認証サーバーへの接続がタイムアウトしました。");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function assertConfigured() {
