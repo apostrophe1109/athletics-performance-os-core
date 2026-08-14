@@ -1,0 +1,14 @@
+{
+  "system": "Athletics Performance OS",
+  "deploymentId": "SITEDEPLOY_e630e63493034e12a2873965ba52cb53",
+  "generatedAt": "2026-08-14T22:58:42.354Z",
+  "baseCommitSha": "a451d4ea3d222027d84179bd6f7cf51450acb1a1",
+  "changeReason": "ユーザー承認済みのiPhone Air向けモバイル表示最適化を、内容変更なしで反映する。",
+  "files": [
+    {
+      "path": "site/styles.css",
+      "operation": "UPSERT",
+      "contentHash": "53253803004a33280f0f76f66533bf2f1dfabcc0c62eec314c01168d497e45f4"
+    }
+  ]
+}

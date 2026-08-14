@@ -158,6 +158,69 @@ button, input { font: inherit; }
   .month-day { min-height: 54px; }
 }
 
+/* iPhone Air / compact iPhone portrait */
+@media (max-width: 480px) {
+  .topbar {
+    align-items: center;
+    gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
+  .topbar > div:first-child { flex: 1 1 auto; min-width: 0; }
+  .topbar h1 {
+    margin: 0;
+    font-size: clamp(1.02rem, 5.2vw, 1.28rem);
+    line-height: 1.12;
+    letter-spacing: -.025em;
+  }
+  .connection { flex: 0 0 auto; gap: 7px; font-size: .74rem; }
+  .connection__dot { width: 8px; height: 8px; }
+
+  .dashboard {
+    gap: 12px;
+    padding: 14px max(12px, env(safe-area-inset-right)) calc(44px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .panel, .panel--wide, .skeleton-panel {
+    padding: 16px;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+  }
+  .skeleton-panel { gap: 12px; padding-block: 18px; }
+  .skeleton { height: 14px; }
+
+  .panel--hero { min-height: 0; padding-top: 22px; }
+  .hero-title { margin: 8px 0; font-size: clamp(2rem, 11vw, 3rem); line-height: .98; }
+  .hero-copy { font-size: .92rem; line-height: 1.65; }
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+  .metric { padding: 12px; }
+  .metric__value { font-size: 1.22rem; }
+
+  .section-head { gap: 6px; margin-bottom: 14px; }
+  .section-head h2, .panel h2 { font-size: 1.08rem; line-height: 1.35; }
+  .section-note { font-size: .72rem; }
+  .record-card { padding: 14px; }
+  .record-card__top { gap: 10px; }
+  .record-card h3 { line-height: 1.4; }
+  .record-card p { font-size: .84rem; line-height: 1.55; }
+
+  .week-grid {
+    grid-template-columns: repeat(7, minmax(96px, 1fr));
+    gap: 7px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .day { min-height: 138px; padding: 11px; scroll-snap-align: start; }
+  .month-grid { gap: 3px; }
+  .month-label { padding: 4px 2px; font-size: .66rem; }
+  .month-day { min-height: 48px; padding: 5px; border-radius: 9px; font-size: .68rem; }
+
+  .search, .login-input { font-size: 16px; }
+  .search { width: 100%; }
+  .login-panel { min-height: 0; }
+  .login-form { width: 100%; gap: 12px; }
+  .login-form h2 { font-size: 1.55rem; }
+  .login-copy { line-height: 1.6; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
