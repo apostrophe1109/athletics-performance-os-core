@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.2
+ * Version: 1.4.3
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.2";
+const VERSION = "1.4.3";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -517,13 +517,16 @@ async function previewSiteLayoutChange(body, auth, env) {
     changeReason: String(body.changeReason || "").trim(),
   };
   if (!lockedPreview.changeReason) throw Object.assign(new Error("changeReasonが必要です。"), { code: "CHANGE_REASON_REQUIRED", status: 400 });
-  const approvalHash = await hmacSha256Hex(canonicalJson(lockedPreview), requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const lockedText = canonicalJson(lockedPreview);
+  const approvalHash = await hmacSha256Hex(lockedText, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const lockedPreviewToken = await createLockedPreviewToken(lockedText, env);
   return {
     success: true,
     status: "AWAITING_EXPLICIT_APPROVAL",
     currentLayout: current.layout,
     proposedLayout: layout,
     lockedPreview,
+    lockedPreviewToken,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
@@ -531,9 +534,9 @@ async function previewSiteLayoutChange(body, auth, env) {
 }
 
 async function applySiteLayoutChange(body, auth, env) {
-  const locked = body.lockedPreview;
+  const resolved = await resolveLockedPreview(body, "SITE_LAYOUT", env);
+  const locked = resolved.locked;
   const approval = body.approval || {};
-  if (!isPlainObject(locked) || locked.previewType !== "SITE_LAYOUT") throw Object.assign(new Error("Site Layout Previewが必要です。"), { code: "SITE_LAYOUT_PREVIEW_REQUIRED", status: 400 });
   if (approval.approved !== true || approval.approvedBy !== "山下祐樹") throw Object.assign(new Error("山下祐樹の明示承認が必要です。"), { code: "APPROVER_MISMATCH", status: 401 });
   if (String(approval.changeReason || "").trim().length < 3 || !/^[A-Za-z0-9_-]{16,128}$/.test(String(approval.nonce || ""))) {
     throw Object.assign(new Error("具体的なchangeReasonと16〜128文字のnonceが必要です。"), { code: "APPROVAL_INVALID", status: 400 });
@@ -543,7 +546,7 @@ async function applySiteLayoutChange(body, auth, env) {
   const requestedAt = Date.parse(locked.requestedAt || "");
   const expiresAt = Date.parse(locked.expiresAt || "");
   if (!Number.isFinite(approvedAt) || approvedAt < requestedAt || approvedAt > expiresAt || Date.now() > expiresAt) throw Object.assign(new Error("承認日時がPreview有効期間外です。"), { code: "APPROVAL_EXPIRED", status: 409 });
-  const expectedHash = await hmacSha256Hex(canonicalJson(locked), requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const expectedHash = await hmacSha256Hex(resolved.lockedText, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
   if (!approval.approvalHash || !await secureEqual(approval.approvalHash, expectedHash)) throw Object.assign(new Error("approvalHashが一致しません。"), { code: "APPROVAL_HASH_MISMATCH", status: 409 });
   validateSiteLayout(locked.proposedLayout);
   const config = siteRepositoryConfig(env);
@@ -786,6 +789,51 @@ async function prepareSiteSourceChange(change, env) {
   };
 }
 
+async function createLockedPreviewToken(lockedText, env) {
+  const payload = base64UrlEncode(String(lockedText));
+  const signingInput = `v1.${payload}`;
+  const signature = await hmacBase64Url(signingInput, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  return `${signingInput}.${signature}`;
+}
+
+async function readLockedPreviewFromToken(token, expectedType, env) {
+  const raw = String(token || "").trim();
+  const parts = raw.split(".");
+  if (parts.length !== 3 || parts[0] !== "v1" || !parts[1] || !parts[2]) {
+    throw Object.assign(new Error("lockedPreviewTokenが不正です。再Previewしてください。"), { code: "LOCKED_PREVIEW_TOKEN_INVALID", status: 400 });
+  }
+  const signingInput = `${parts[0]}.${parts[1]}`;
+  const expectedSignature = await hmacBase64Url(signingInput, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  if (!await secureEqual(parts[2], expectedSignature)) {
+    throw Object.assign(new Error("lockedPreviewToken署名が一致しません。再Previewしてください。"), { code: "LOCKED_PREVIEW_TOKEN_SIGNATURE_MISMATCH", status: 409 });
+  }
+  let lockedText;
+  let locked;
+  try {
+    lockedText = base64UrlText(parts[1]);
+    locked = JSON.parse(lockedText);
+  } catch {
+    throw Object.assign(new Error("lockedPreviewTokenを復元できません。再Previewしてください。"), { code: "LOCKED_PREVIEW_TOKEN_DECODE_FAILED", status: 400 });
+  }
+  if (!isPlainObject(locked) || locked.previewType !== expectedType) {
+    throw Object.assign(new Error("lockedPreviewTokenのPreview種別が一致しません。"), { code: "LOCKED_PREVIEW_TOKEN_TYPE_MISMATCH", status: 400 });
+  }
+  if (canonicalJson(locked) !== lockedText) {
+    throw Object.assign(new Error("lockedPreviewTokenのcanonical payloadが不正です。"), { code: "LOCKED_PREVIEW_TOKEN_CANONICAL_MISMATCH", status: 409 });
+  }
+  return { locked, lockedText };
+}
+
+async function resolveLockedPreview(body, expectedType, env) {
+  const token = String(body?.lockedPreviewToken || "").trim();
+  if (token) return readLockedPreviewFromToken(token, expectedType, env);
+  const locked = body?.lockedPreview;
+  if (!isPlainObject(locked) || locked.previewType !== expectedType) {
+    throw Object.assign(new Error("対応するPreviewが必要です。"), { code: "LOCKED_PREVIEW_REQUIRED", status: 400 });
+  }
+  return { locked, lockedText: canonicalJson(locked) };
+}
+
 async function previewSiteSourceChange(body, auth, env) {
   const changes = Array.isArray(body.changes) ? body.changes : [];
   if (!changes.length || changes.length > SITE_SOURCE_MAX_CHANGE_ITEMS) {
@@ -822,6 +870,7 @@ async function previewSiteSourceChange(body, auth, env) {
     throw Object.assign(new Error("Source Previewが大きすぎます。変更を複数回へ分割してください。"), { code: "SITE_SOURCE_PREVIEW_TOO_LARGE", status: 413 });
   }
   const approvalHash = await hmacSha256Hex(lockedText, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const lockedPreviewToken = await createLockedPreviewToken(lockedText, env);
   return {
     success: true,
     status: "AWAITING_EXPLICIT_APPROVAL",
@@ -840,13 +889,14 @@ async function previewSiteSourceChange(body, auth, env) {
       proposedChars: item.proposedChars,
     })),
     lockedPreview,
+    lockedPreviewToken,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
   };
 }
 
-async function validateSiteSourceApproval(locked, approval, expectedType, env) {
+async function validateSiteSourceApproval(locked, approval, expectedType, env, lockedText = null) {
   if (!isPlainObject(locked) || locked.previewType !== expectedType) throw Object.assign(new Error("対応するSite Source Previewが必要です。"), { code: "SITE_SOURCE_PREVIEW_REQUIRED", status: 400 });
   if (approval.approved !== true || approval.approvedBy !== "山下祐樹") throw Object.assign(new Error("山下祐樹の明示承認が必要です。"), { code: "APPROVER_MISMATCH", status: 401 });
   if (String(approval.changeReason || "").trim().length < 3 || !/^[A-Za-z0-9_-]{16,128}$/.test(String(approval.nonce || ""))) {
@@ -859,7 +909,7 @@ async function validateSiteSourceApproval(locked, approval, expectedType, env) {
   if (!Number.isFinite(approvedAt) || approvedAt < requestedAt || approvedAt > expiresAt || Date.now() > expiresAt) {
     throw Object.assign(new Error("承認日時がPreview有効期間外です。"), { code: "APPROVAL_EXPIRED", status: 409 });
   }
-  const expectedHash = await hmacSha256Hex(canonicalJson(locked), requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const expectedHash = await hmacSha256Hex(lockedText || canonicalJson(locked), requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
   if (!approval.approvalHash || !await secureEqual(approval.approvalHash, expectedHash)) {
     throw Object.assign(new Error("approvalHashが一致しません。"), { code: "APPROVAL_HASH_MISMATCH", status: 409 });
   }
@@ -891,9 +941,10 @@ async function createSiteDeployManifestBlob(repo, deploymentId, commitBaseSha, c
 }
 
 async function applySiteSourceChange(body, auth, env) {
-  const locked = body.lockedPreview;
+  const resolved = await resolveLockedPreview(body, "SITE_SOURCE", env);
+  const locked = resolved.locked;
   const approval = body.approval || {};
-  await validateSiteSourceApproval(locked, approval, "SITE_SOURCE", env);
+  await validateSiteSourceApproval(locked, approval, "SITE_SOURCE", env, resolved.lockedText);
   if (locked.changes.some(item => item.operation === "DELETE") && approval.destructiveApproval !== "SOURCE_DELETE_APPROVED") {
     throw Object.assign(new Error("Source file削除にはdestructiveApproval=SOURCE_DELETE_APPROVEDが必要です。"), { code: "SOURCE_DELETE_APPROVAL_REQUIRED", status: 400 });
   }
@@ -1048,7 +1099,9 @@ async function previewSiteSourceRollback(body, auth, env) {
     rollbackToTreeSha: previousTreeSha,
     changeReason,
   };
-  const approvalHash = await hmacSha256Hex(canonicalJson(lockedPreview), requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const lockedText = canonicalJson(lockedPreview);
+  const approvalHash = await hmacSha256Hex(lockedText, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const lockedPreviewToken = await createLockedPreviewToken(lockedText, env);
   return {
     success: true,
     status: "AWAITING_EXPLICIT_APPROVAL",
@@ -1056,6 +1109,7 @@ async function previewSiteSourceRollback(body, auth, env) {
     rollbackToCommitSha: previousCommitSha,
     deploymentId: lockedPreview.deploymentId,
     lockedPreview,
+    lockedPreviewToken,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
@@ -1063,9 +1117,10 @@ async function previewSiteSourceRollback(body, auth, env) {
 }
 
 async function applySiteSourceRollback(body, auth, env) {
-  const locked = body.lockedPreview;
+  const resolved = await resolveLockedPreview(body, "SITE_SOURCE_ROLLBACK", env);
+  const locked = resolved.locked;
   const approval = body.approval || {};
-  await validateSiteSourceApproval(locked, approval, "SITE_SOURCE_ROLLBACK", env);
+  await validateSiteSourceApproval(locked, approval, "SITE_SOURCE_ROLLBACK", env, resolved.lockedText);
   const state = await currentBranchState(env);
   if (state.commitSha !== locked.currentCommitSha) {
     throw Object.assign(new Error("Rollback Preview後にbranchが変更されています。再Previewしてください。"), { code: "SITE_SOURCE_ROLLBACK_STATE_CHANGED", status: 409 });
