@@ -1,0 +1,835 @@
+openapi: 3.1.0
+info:
+  title: APOS Control Gateway v2.5
+  version: 2.5.2
+  description: APOS Control Gateway for MyGPT. GPT Editorの30-operation上限に合わせた公開Contract。Backendには互換用の非公開operationが残る場合がある。
+servers:
+- url: https://athletics-performance-os-gateway.t-f-hjtjyh.workers.dev
+security:
+- bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Gateway・Apps Script・Spreadsheetの稼働状態を確認
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/inventory:
+    post:
+      operationId: inventory
+      summary: 正本のentity・シート・件数・schemaHashを確認
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/validateSchema:
+    post:
+      operationId: validateSchema
+      summary: データ辞書と実ヘッダーの整合性を検証
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getRecords:
+    post:
+      operationId: getRecords
+      summary: 正本のentityを条件指定で検索・取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetRecordsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getRecord:
+    post:
+      operationId: getRecord
+      summary: 正本レコードを主キー完全一致で取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetRecordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/searchExercises:
+    post:
+      operationId: searchExercises
+      summary: 登録済み種目を名称・別名・目的等から検索
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchExercisesRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getTrainingContext:
+    post:
+      operationId: getTrainingContext
+      summary: 指定日のACTIVEルール・計画・実績・計測記録等を取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingContextRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getTodaySession:
+    post:
+      operationId: getTodaySession
+      summary: 今日または指定日のTraining Contextを取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingContextRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getSiteLayout:
+    post:
+      operationId: getSiteLayout
+      summary: APOS Viewの現在のUIレイアウトを取得
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewSiteLayoutChange:
+    post:
+      operationId: previewSiteLayoutChange
+      summary: APOS ViewのUI変更を保存せずPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteLayoutPreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applySiteLayoutChange:
+    post:
+      operationId: applySiteLayoutChange
+      summary: 明示承認済みのAPOS View変更をGitHubへ反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getSiteSourceTree:
+    post:
+      operationId: getSiteSourceTree
+      summary: APOS Viewの編集可能なソースファイル一覧を取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteSourceTreeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getSiteSourceFile:
+    post:
+      operationId: getSiteSourceFile
+      summary: APOS Viewのソースファイルを分割して取得
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteSourceFileRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewSiteSourceChange:
+    post:
+      operationId: previewSiteSourceChange
+      summary: HTML・CSS・JS等の変更をGitHubへ書かずPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteSourcePreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applySiteSourceChange:
+    post:
+      operationId: applySiteSourceChange
+      summary: 承認済みサイトソース変更をGitHubへ1コミットで反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getSiteDeploymentStatus:
+    post:
+      operationId: getSiteDeploymentStatus
+      summary: GitHub Pagesへの公開反映をdeploymentIdで確認
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteDeploymentStatusRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewSiteSourceRollback:
+    post:
+      operationId: previewSiteSourceRollback
+      summary: サイトソースを直前状態へ戻す内容をPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteSourceRollbackPreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applySiteSourceRollback:
+    post:
+      operationId: applySiteSourceRollback
+      summary: 承認済みサイトソースRollbackを新コミットで反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewMutation:
+    post:
+      operationId: previewMutation
+      summary: 単件の追加・更新・ARCHIVE・削除を保存せずPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MutationPreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applyMutation:
+    post:
+      operationId: applyMutation
+      summary: 直前の単件Previewを明示承認後に反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewBatch:
+    post:
+      operationId: previewBatch
+      summary: 最大25件の変更を保存せず一括Preview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchPreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applyBatch:
+    post:
+      operationId: applyBatch
+      summary: 直前のBatch Previewを明示承認後に一括反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewRollback:
+    post:
+      operationId: previewRollback
+      summary: changeIdの復元内容を保存せずPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RollbackPreviewRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/applyRollback:
+    post:
+      operationId: applyRollback
+      summary: Rollback Previewを明示承認後に実行
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/previewBackup:
+    post:
+      operationId: previewBackup
+      summary: Spreadsheetバックアップ予定を保存せずPreview
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/createBackup:
+    post:
+      operationId: createBackup
+      summary: Backup Previewを明示承認後に作成
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/getMaintenanceCapabilities:
+    post:
+      operationId: getMaintenanceCapabilities
+      summary: 保守操作の対応能力と安全規則を取得
+      x-openai-isConsequential: false
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/maintenanceRead:
+    post:
+      operationId: maintenanceRead
+      summary: システムソースやデプロイ状態を読み取り
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/maintenancePreview:
+    post:
+      operationId: maintenancePreview
+      summary: システムコード変更をGitHubへ書かずPreview
+      x-openai-isConsequential: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+  /api/maintenanceApply:
+    post:
+      operationId: maintenanceApply
+      summary: 承認済みシステムコード変更を反映
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/JsonResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    JsonResponse:
+      description: APOS JSON response
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+            properties: {}
+  schemas:
+    EntityName:
+      type: string
+      enum:
+      - overview
+      - settings
+      - sportProfiles
+      - governanceRules
+      - trainingRules
+      - exercises
+      - cycles
+      - events
+      - sessions
+      - menuItems
+      - executions
+      - reviews
+      - measurements
+      - media
+      - proposals
+      - changes
+      - batches
+      - idLedger
+      - recurrenceRules
+      - migrationAudit
+      - dictionary
+      - options
+    GetRecordsRequest:
+      type: object
+      required:
+      - entity
+      additionalProperties: false
+      properties:
+        entity:
+          $ref: '#/components/schemas/EntityName'
+        filters:
+          type: object
+          additionalProperties: true
+          properties: {}
+        sortBy:
+          type: string
+        sortDirection:
+          type: string
+          enum:
+          - ASC
+          - DESC
+          default: ASC
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+        includeRowNumber:
+          type: boolean
+          default: false
+    GetRecordRequest:
+      type: object
+      required:
+      - entity
+      - key
+      additionalProperties: false
+      properties:
+        entity:
+          $ref: '#/components/schemas/EntityName'
+        key:
+          type: string
+    SearchExercisesRequest:
+      type: object
+      required:
+      - query
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          minLength: 1
+        includeArchived:
+          type: boolean
+          default: false
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+    TrainingContextRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        date:
+          type: string
+          format: date
+        historyDays:
+          type: integer
+          minimum: 1
+          maximum: 28
+          default: 14
+    ExerciseGuideRequest:
+      type: object
+      required:
+      - exerciseId
+      additionalProperties: false
+      properties:
+        exerciseId:
+          type: string
+          minLength: 1
+    SiteLayoutPreviewRequest:
+      type: object
+      required:
+      - layout
+      - changeReason
+      additionalProperties: false
+      properties:
+        layout:
+          type: object
+          additionalProperties: true
+          properties: {}
+        changeReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    MutationPreviewRequest:
+      type: object
+      required:
+      - mutation
+      additionalProperties: false
+      properties:
+        mutation:
+          $ref: '#/components/schemas/Mutation'
+    BatchPreviewRequest:
+      type: object
+      required:
+      - mutations
+      additionalProperties: false
+      properties:
+        mutations:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/Mutation'
+    RollbackPreviewRequest:
+      type: object
+      required:
+      - changeId
+      additionalProperties: false
+      properties:
+        changeId:
+          type: string
+          minLength: 1
+        proposal:
+          $ref: '#/components/schemas/Proposal'
+    Mutation:
+      type: object
+      required:
+      - entity
+      - operation
+      additionalProperties: false
+      properties:
+        entity:
+          $ref: '#/components/schemas/EntityName'
+        operation:
+          type: string
+          enum:
+          - INSERT
+          - UPDATE
+          - UPSERT
+          - ARCHIVE
+          - DELETE
+          description: UPDATEはchanges、INSERTはrecordを使用する。
+        key:
+          type: string
+        record:
+          type: object
+          additionalProperties: true
+          description: INSERTまたは新規UPSERTの完全レコード。
+          properties: {}
+        proposal:
+          $ref: '#/components/schemas/Proposal'
+        changes:
+          type: object
+          additionalProperties: true
+          description: UPDATEの部分更新値。UPDATEでは必須。
+          properties: {}
+    Proposal:
+      type: object
+      additionalProperties: false
+      properties:
+        proposalId:
+          type: string
+        proposalType:
+          type: string
+        sportProfileId:
+          type: string
+        targetDate:
+          type: string
+          format: date
+        title:
+          type: string
+        intent:
+          type: string
+        dose:
+          type: string
+        intensity:
+          type: string
+        rest:
+          type: string
+        existingOptionsChecked:
+          type: string
+        reasonExistingInsufficient:
+          type: string
+        goalConnection:
+          type: string
+        risk:
+          type: string
+        stopCondition:
+          type: string
+        conflicts:
+          type: string
+        affectedEntities:
+          type: string
+        rollbackPlan:
+          type: string
+        requestedBy:
+          type: string
+        notes:
+          type: string
+      required:
+      - proposalType
+      - sportProfileId
+      - title
+      - intent
+      - dose
+      - intensity
+      - existingOptionsChecked
+      - reasonExistingInsufficient
+      - goalConnection
+      - risk
+      - stopCondition
+      - rollbackPlan
+    ApplyRequest:
+      type: object
+      required:
+      - lockedPreview
+      - approval
+      additionalProperties: false
+      properties:
+        lockedPreview:
+          type: object
+          additionalProperties: true
+          properties: {}
+        approval:
+          $ref: '#/components/schemas/Approval'
+    Approval:
+      type: object
+      required:
+      - approved
+      - approvedBy
+      - approvedAt
+      - nonce
+      - changeReason
+      - approvalHash
+      additionalProperties: false
+      properties:
+        approved:
+          type: boolean
+          enum:
+          - true
+        approvedBy:
+          type: string
+          enum:
+          - 山下祐樹
+        approvedAt:
+          type: string
+          format: date-time
+        nonce:
+          type: string
+          minLength: 16
+          maxLength: 128
+          pattern: ^[A-Za-z0-9_-]+$
+        changeReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+        approvalHash:
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: ^[A-Fa-f0-9]{64}$
+        destructiveApproval:
+          type: string
+          enum:
+          - DELETE_APPROVED
+          - SOURCE_DELETE_APPROVED
+    SiteSourceTreeRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        recursive:
+          type: boolean
+          default: true
+    SiteSourceFileRequest:
+      type: object
+      required:
+      - path
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 240
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 30000
+          default: 30000
+    TextPatch:
+      type: object
+      required:
+      - find
+      - replace
+      additionalProperties: false
+      properties:
+        find:
+          type: string
+          minLength: 1
+          maxLength: 30000
+        replace:
+          type: string
+          maxLength: 30000
+        expectedCount:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 1
+    SiteSourceChangeItem:
+      type: object
+      required:
+      - path
+      - mode
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 240
+        mode:
+          type: string
+          enum:
+          - REPLACE_FILE
+          - PATCH_TEXT
+          - DELETE_FILE
+        content:
+          type: string
+          maxLength: 60000
+        patches:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/TextPatch'
+    SiteSourcePreviewRequest:
+      type: object
+      required:
+      - changes
+      - changeReason
+      additionalProperties: false
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SiteSourceChangeItem'
+        changeReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    SiteDeploymentStatusRequest:
+      type: object
+      required:
+      - deploymentId
+      additionalProperties: false
+      properties:
+        deploymentId:
+          type: string
+          minLength: 10
+          maxLength: 120
+    SiteSourceRollbackPreviewRequest:
+      type: object
+      required:
+      - appliedCommitSha
+      - previousCommitSha
+      - changeReason
+      additionalProperties: false
+      properties:
+        appliedCommitSha:
+          type: string
+          pattern: ^[A-Fa-f0-9]{40}$
+        previousCommitSha:
+          type: string
+          pattern: ^[A-Fa-f0-9]{40}$
+        changeReason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    MaintenanceRequest:
+      type: object
+      required:
+      - operation
+      additionalProperties: false
+      properties:
+        operation:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: getMaintenanceCapabilitiesが返したoperation名を指定。
+        payload:
+          type: object
+          additionalProperties: true
+          description: operation固有payload。未定義operationを推測しない。
+          properties: {}
