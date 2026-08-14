@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_f9723a524b0048799660f710eebffee1",
-  "generatedAt": "2026-08-14T14:03:41.235Z",
-  "baseCommitSha": "becbb885539ae578dc095aff0d46b251d4e6ce55",
-  "changeReason": "Apps Script Deployment ScriptへDeploy後の独立Read-back Verifyを追加し、実反映確認後のみVERIFIEDとするため。",
+  "deploymentId": "SITEDEPLOY_e4a3e535998544e4bd14bb48bc2c6011",
+  "generatedAt": "2026-08-14T23:16:35.607Z",
+  "baseCommitSha": "6a0220d604f019bd42170208de888acb0cdc3949",
+  "changeReason": "ユーザーが画像Previewの状態を承認したため、APOS View公式OriginのCORS許可修正を反映する。",
   "files": [
     {
-      "path": "system/deploy_apps_script.py",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "6348b9c00dab577d4ef59b71020d311bfb1114128960158084d17d73d468ce55"
+      "contentHash": "d4b2ea7c40e5b1fb4ddafa3d9f5768e6df3b83b5fe050cbd1a4b5d114d01b8fa"
     }
   ]
 }

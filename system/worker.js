@@ -1455,8 +1455,13 @@ function actionFromPath(pathname) {
 }
 
 function isAllowedOrigin(origin, env) {
-  const allowed = csv(env.APOS_ALLOWED_ORIGINS);
-  return !origin || allowed.includes(origin);
+  const allowed = new Set(csv(env.APOS_ALLOWED_ORIGINS));
+  const publicUrl = sitePublicUrl(env);
+  if (publicUrl) {
+    try { allowed.add(new URL(publicUrl).origin); }
+    catch {}
+  }
+  return !origin || allowed.has(origin);
 }
 
 function corsHeaders(origin, env) {
