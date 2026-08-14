@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.3
+ * Version: 1.4.4
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.3";
+const VERSION = "1.4.4";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -527,6 +527,8 @@ async function previewSiteLayoutChange(body, auth, env) {
     proposedLayout: layout,
     lockedPreview,
     lockedPreviewToken,
+    lockedPreviewTokenVersion: "v2",
+    lockedPreviewTokenChars: lockedPreviewToken.length,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
@@ -789,9 +791,36 @@ async function prepareSiteSourceChange(change, env) {
   };
 }
 
+function bytesReadableStream(bytes) {
+  const value = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(value);
+      controller.close();
+    },
+  });
+}
+
+async function gzipTextToBase64Url(value) {
+  const source = bytesReadableStream(new TextEncoder().encode(String(value)));
+  const compressed = source.pipeThrough(new CompressionStream("gzip"));
+  const buffer = await new Response(compressed).arrayBuffer();
+  return bytesToBase64Url(new Uint8Array(buffer));
+}
+
+async function gunzipBase64UrlText(value) {
+  const source = bytesReadableStream(base64UrlBytes(value));
+  const decompressed = source.pipeThrough(new DecompressionStream("gzip"));
+  const buffer = await new Response(decompressed).arrayBuffer();
+  return new TextDecoder().decode(buffer);
+}
+
 async function createLockedPreviewToken(lockedText, env) {
-  const payload = base64UrlEncode(String(lockedText));
-  const signingInput = `v1.${payload}`;
+  // v2: canonical lockedPreview JSONをgzipしてからbase64url化する。
+  // 目的はPreview内容を変えずにopaque tokenを短縮し、MyGPT Action経由の
+  // 長大token搬送で生じる切断・転記揺れのリスクを下げること。
+  const payload = await gzipTextToBase64Url(String(lockedText));
+  const signingInput = `v2.${payload}`;
   const signature = await hmacBase64Url(signingInput, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
   return `${signingInput}.${signature}`;
 }
@@ -799,7 +828,8 @@ async function createLockedPreviewToken(lockedText, env) {
 async function readLockedPreviewFromToken(token, expectedType, env) {
   const raw = String(token || "").trim();
   const parts = raw.split(".");
-  if (parts.length !== 3 || parts[0] !== "v1" || !parts[1] || !parts[2]) {
+  const tokenVersion = parts[0];
+  if (parts.length !== 3 || !["v1", "v2"].includes(tokenVersion) || !parts[1] || !parts[2]) {
     throw Object.assign(new Error("lockedPreviewTokenが不正です。再Previewしてください。"), { code: "LOCKED_PREVIEW_TOKEN_INVALID", status: 400 });
   }
   const signingInput = `${parts[0]}.${parts[1]}`;
@@ -810,7 +840,9 @@ async function readLockedPreviewFromToken(token, expectedType, env) {
   let lockedText;
   let locked;
   try {
-    lockedText = base64UrlText(parts[1]);
+    lockedText = tokenVersion === "v2"
+      ? await gunzipBase64UrlText(parts[1])
+      : base64UrlText(parts[1]);
     locked = JSON.parse(lockedText);
   } catch {
     throw Object.assign(new Error("lockedPreviewTokenを復元できません。再Previewしてください。"), { code: "LOCKED_PREVIEW_TOKEN_DECODE_FAILED", status: 400 });
@@ -821,7 +853,7 @@ async function readLockedPreviewFromToken(token, expectedType, env) {
   if (canonicalJson(locked) !== lockedText) {
     throw Object.assign(new Error("lockedPreviewTokenのcanonical payloadが不正です。"), { code: "LOCKED_PREVIEW_TOKEN_CANONICAL_MISMATCH", status: 409 });
   }
-  return { locked, lockedText };
+  return { locked, lockedText, tokenVersion };
 }
 
 async function resolveLockedPreview(body, expectedType, env) {
@@ -890,6 +922,8 @@ async function previewSiteSourceChange(body, auth, env) {
     })),
     lockedPreview,
     lockedPreviewToken,
+    lockedPreviewTokenVersion: "v2",
+    lockedPreviewTokenChars: lockedPreviewToken.length,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
@@ -1110,6 +1144,8 @@ async function previewSiteSourceRollback(body, auth, env) {
     deploymentId: lockedPreview.deploymentId,
     lockedPreview,
     lockedPreviewToken,
+    lockedPreviewTokenVersion: "v2",
+    lockedPreviewTokenChars: lockedPreviewToken.length,
     approvalHash,
     finalApprover: "山下祐樹",
     writePerformed: false,
