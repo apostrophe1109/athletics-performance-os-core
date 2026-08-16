@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.7
+ * Version: 1.4.8
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.7";
+const VERSION = "1.4.8";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1315,7 +1315,7 @@ function base64Utf8Decode(value) {
 }
 
 const MAINTENANCE_SOURCE_ROOT_DEFAULT = "system";
-const MAINTENANCE_READ_OPERATIONS = new Set(["SYSTEM_TREE", "SYSTEM_FILE", "RUNTIME_POLICY", "DEPLOYMENT_STATUS"]);
+const MAINTENANCE_READ_OPERATIONS = new Set(["SYSTEM_TREE", "SYSTEM_FILE", "RUNTIME_POLICY", "DEPLOYMENT_STATUS", "DEPLOYMENT_DIAGNOSTIC"]);
 const MAINTENANCE_PREVIEW_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
 const MAINTENANCE_APPLY_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
 
@@ -1363,6 +1363,56 @@ async function getMaintenanceCapabilities(env) {
   };
 }
 
+function redactMaintenanceDiagnostic(value) {
+  return String(value || "")
+    .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+    .replace(/((?:refresh[_-]?token|client[_-]?secret|token|password|secret)\s*[=:]\s*)\S+/gi, "$1[REDACTED]")
+    .replace(/[A-Za-z0-9._~-]{40,}/g, "[REDACTED_LONG]")
+    .slice(-12000);
+}
+
+async function getMaintenanceDeploymentDiagnostic(payload, env) {
+  const runId = Number(payload.runId);
+  if (!Number.isInteger(runId) || runId <= 0) {
+    throw Object.assign(new Error("DEPLOYMENT_DIAGNOSTICにはrunIdが必要です。"), { code: "MAINTENANCE_RUN_ID_REQUIRED", status: 400 });
+  }
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const jobsPayload = await githubJson(`${repo}/actions/runs/${runId}/jobs?per_page=100`, env, { code: "MAINTENANCE_DEPLOYMENT_DIAGNOSTIC_FAILED" });
+  const jobs = (Array.isArray(jobsPayload?.jobs) ? jobsPayload.jobs : []).map(job => ({
+    id: Number(job?.id || 0),
+    name: String(job?.name || ""),
+    status: String(job?.status || ""),
+    conclusion: job?.conclusion || null,
+    startedAt: job?.started_at || null,
+    completedAt: job?.completed_at || null,
+  }));
+  const failedJobs = jobs.filter(job => job.id > 0 && job.conclusion && job.conclusion !== "success");
+  const failedJobLogs = [];
+  for (const job of failedJobs.slice(0, 3)) {
+    const logApi = `${repo}/actions/jobs/${job.id}/logs`;
+    let response = await fetch(logApi, { headers: githubHeaders(env), redirect: "manual" });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location) throw Object.assign(new Error("GitHub job log redirect先を取得できません。"), { code: "MAINTENANCE_JOB_LOG_REDIRECT_MISSING", status: 502 });
+      response = await fetch(location, { headers: { accept: "text/plain" }, redirect: "follow" });
+    }
+    if (!response.ok) throw Object.assign(new Error(`GitHub job log取得に失敗しました (${response.status})。`), { code: "MAINTENANCE_JOB_LOG_READ_FAILED", status: 502 });
+    const raw = await response.text();
+    const errorLines = raw.split(/\r?\n/)
+      .filter(line => /(traceback|runtimeerror|error|failed|http\s+\d|forbidden|permission|scope|invalid|mismatch|refusing|exception)/i.test(line))
+      .slice(-80)
+      .join("\n");
+    failedJobLogs.push({
+      jobId: job.id,
+      name: job.name,
+      conclusion: job.conclusion,
+      errorLines: redactMaintenanceDiagnostic(errorLines),
+    });
+  }
+  return { success: true, status: "READY", runId, jobs, failedJobLogs, writePerformed: false };
+}
+
 async function maintenanceRead(body, auth, env) {
   const operation = normalizeMaintenanceOperation(body.operation);
   if (!MAINTENANCE_READ_OPERATIONS.has(operation)) {
@@ -1386,6 +1436,10 @@ async function maintenanceRead(body, auth, env) {
     const path = `${maintenanceSourceRoot(env)}/runtime-policy.json`;
     const result = await getSiteSourceFile({ path, offset: 0, limit: SITE_SOURCE_CHUNK_MAX }, scopedEnv);
     return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM", policyPath: path };
+  }
+  if (operation === "DEPLOYMENT_DIAGNOSTIC") {
+    const result = await getMaintenanceDeploymentDiagnostic(payload, env);
+    return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM" };
   }
   return getMaintenanceDeploymentStatus(payload, env);
 }
