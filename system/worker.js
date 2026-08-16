@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.10
+ * Version: 1.4.11
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.10";
+const VERSION = "1.4.11";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1413,6 +1413,59 @@ async function getMaintenanceDeploymentDiagnostic(payload, env) {
   return { success: true, status: "READY", runId, jobs, failedJobLogs, writePerformed: false };
 }
 
+async function maintenanceBackendProbe(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort("diagnostic-timeout"), timeoutMs);
+  try {
+    let response = await fetch(url, { ...options, redirect: "manual", signal: controller.signal });
+    const firstHttpStatus = response.status;
+    const location = response.headers.get("location");
+    let redirectHost = null;
+    let redirected = false;
+    if ([301, 302, 303, 307, 308].includes(response.status) && location) {
+      redirected = true;
+      try { redirectHost = new URL(location).hostname; } catch { redirectHost = "INVALID_REDIRECT_URL"; }
+      response = await fetch(location, { headers: { accept: "application/json" }, redirect: "follow", signal: controller.signal });
+    }
+    const text = await response.text();
+    let bodySummary;
+    try {
+      const parsed = JSON.parse(text);
+      bodySummary = {
+        json: true,
+        success: parsed?.success ?? null,
+        status: parsed?.status ?? null,
+        code: parsed?.code ?? null,
+        error: parsed?.error ? String(parsed.error).slice(0, 240) : null,
+        version: parsed?.version ?? parsed?.apiVersion ?? null,
+      };
+    } catch {
+      bodySummary = {
+        json: false,
+        looksHtml: /^\s*(?:<!doctype|<html)/i.test(text),
+        chars: text.length,
+      };
+    }
+    return {
+      timedOut: false,
+      firstHttpStatus,
+      redirected,
+      redirectHost,
+      finalHttpStatus: response.status,
+      finalContentType: response.headers.get("content-type") || null,
+      bodySummary,
+    };
+  } catch (error) {
+    return {
+      timedOut: error?.name === "AbortError" || String(error?.message || "").toLowerCase().includes("timeout"),
+      errorType: error?.name || "Error",
+      error: safeErrorMessage(error),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getMaintenanceBackendDiagnostic(env) {
   const normalizedUrl = normalizeAppsScriptUrl(requiredEnv(env, "APOS_APPS_SCRIPT_URL"));
   const parsedUrl = new URL(normalizedUrl);
@@ -1432,42 +1485,26 @@ async function getMaintenanceBackendDiagnostic(env) {
     repoVariableError = { code: error.code || "MAINTENANCE_BACKEND_VARIABLE_READ_FAILED", error: safeErrorMessage(error) };
   }
 
+  const getUrl = new URL(normalizedUrl);
+  getUrl.searchParams.set("action", "health");
+  const getProbe = await maintenanceBackendProbe(getUrl.toString(), {
+    method: "GET",
+    headers: { accept: "application/json" },
+  });
+
+  const unsignedPostProbe = await maintenanceBackendProbe(normalizedUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8", accept: "application/json" },
+    body: "{}",
+  });
+
   const requestId = `diag_${crypto.randomUUID()}`;
   const envelope = await buildSignedEnvelope("health", {}, { id: "apostrophe", source: "MAINTENANCE" }, requestId, env);
-  let response = await fetch(normalizedUrl, {
+  const signedHealthProbe = await maintenanceBackendProbe(normalizedUrl, {
     method: "POST",
     headers: { "content-type": "application/json; charset=utf-8", accept: "application/json" },
     body: JSON.stringify(envelope),
-    redirect: "manual",
   });
-  const firstHttpStatus = response.status;
-  const location = response.headers.get("location");
-  let redirectHost = null;
-  let redirected = false;
-  if ([301, 302, 303, 307, 308].includes(response.status) && location) {
-    redirected = true;
-    try { redirectHost = new URL(location).hostname; } catch { redirectHost = "INVALID_REDIRECT_URL"; }
-    response = await fetch(location, { headers: { accept: "application/json" }, redirect: "follow" });
-  }
-
-  const text = await response.text();
-  let bodySummary = null;
-  try {
-    const parsed = JSON.parse(text);
-    bodySummary = {
-      json: true,
-      success: parsed?.success ?? null,
-      status: parsed?.status ?? null,
-      code: parsed?.code ?? null,
-      error: parsed?.error ? String(parsed.error).slice(0, 240) : null,
-    };
-  } catch {
-    bodySummary = {
-      json: false,
-      looksHtml: /^\s*(?:<!doctype|<html)/i.test(text),
-      chars: text.length,
-    };
-  }
 
   return {
     success: true,
@@ -1477,12 +1514,9 @@ async function getMaintenanceBackendDiagnostic(env) {
     deploymentIdMatches: repoVariableReadable && repoDeploymentId ? urlDeploymentId === repoDeploymentId : null,
     repoVariableReadable,
     repoVariableError,
-    firstHttpStatus,
-    redirected,
-    redirectHost,
-    finalHttpStatus: response.status,
-    finalContentType: response.headers.get("content-type") || null,
-    bodySummary,
+    getProbe,
+    unsignedPostProbe,
+    signedHealthProbe,
     writePerformed: false,
   };
 }

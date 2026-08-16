@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_fecafeb51ecf4d508de46426c4b8e884",
-  "generatedAt": "2026-08-16T19:25:00.323Z",
-  "baseCommitSha": "2932f9b3442c97c06f10f07f5e5e82b81fb9aed3",
-  "changeReason": "認証障害修正を完遂するため、Apps Script URLとDeployment ID、HTTP応答を秘密値非開示で診断できるREAD専用機能を追加する。",
+  "deploymentId": "SITEDEPLOY_1f7ddd1cd23142c29fff3da55a3a2580",
+  "generatedAt": "2026-08-16T19:29:27.048Z",
+  "baseCommitSha": "788c97414ea4c5040c34d5b2d139336e7f5960af",
+  "changeReason": "認証障害の停止箇所を特定するため、GET health・署名なしPOST・署名付きhealthを各10秒上限で診断するREAD専用機能を反映する。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "8bf253f3004b28d7c06305036506bcef801cfa488ba87caaaaf2c2720582be6e"
+      "contentHash": "b0b60fe960e3026e6160d0aa89229fd8b368fd1200d95e6bd8db01525fbc0958"
     }
   ]
 }
