@@ -975,6 +975,40 @@ async function createSiteDeployManifestBlob(repo, deploymentId, commitBaseSha, c
   return createGitBlob(repo, `${JSON.stringify(manifest, null, 2)}\n`, env);
 }
 
+async function dispatchSiteDeploymentOnce(deploymentId, commitSha, env) {
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const workflowFile = "deploy-site.yml";
+  try {
+    await githubJson(`${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`, env, {
+      write: true,
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: { ref: config.branch },
+      code: "SITE_DEPLOYMENT_DISPATCH_FAILED",
+    });
+    return {
+      attempted: true,
+      status: "DISPATCHED",
+      workflowFile,
+      deploymentId,
+      commitSha,
+      retryPerformed: false,
+    };
+  } catch (error) {
+    return {
+      attempted: true,
+      status: "DISPATCH_FAILED",
+      workflowFile,
+      deploymentId,
+      commitSha,
+      code: error.code || "SITE_DEPLOYMENT_DISPATCH_FAILED",
+      error: safeErrorMessage(error),
+      retryPerformed: false,
+    };
+  }
+}
+
 async function applySiteSourceChange(body, auth, env) {
   const resolved = await resolveLockedPreview(body, "SITE_SOURCE", env);
   const locked = resolved.locked;
@@ -1061,6 +1095,9 @@ async function applySiteSourceChange(body, auth, env) {
     code: "SITE_SOURCE_REF_UPDATE_FAILED",
   });
   markApprovalNonceUsed(approval.nonce);
+  const siteDeploymentDispatch = siteSourceRoot(env) !== maintenanceSourceRoot(env)
+    ? await dispatchSiteDeploymentOnce(locked.deploymentId, newCommitSha, env)
+    : { attempted: false, status: "NOT_SITE_SOURCE", deploymentId: locked.deploymentId, commitSha: newCommitSha, retryPerformed: false };
 
   return {
     success: true,
@@ -1076,6 +1113,7 @@ async function applySiteSourceChange(body, auth, env) {
     executor: auth.actor,
     deploymentExpected: true,
     deploymentCheckRecommended: true,
+    siteDeploymentDispatch,
     rollbackAvailable: true,
     writePerformed: true,
   };
@@ -1201,6 +1239,9 @@ async function applySiteSourceRollback(body, auth, env) {
     code: "SITE_SOURCE_ROLLBACK_REF_UPDATE_FAILED",
   });
   markApprovalNonceUsed(approval.nonce);
+  const siteDeploymentDispatch = siteSourceRoot(env) !== maintenanceSourceRoot(env)
+    ? await dispatchSiteDeploymentOnce(locked.deploymentId, newCommitSha, env)
+    : { attempted: false, status: "NOT_SITE_SOURCE", deploymentId: locked.deploymentId, commitSha: newCommitSha, retryPerformed: false };
   return {
     success: true,
     status: "ROLLED_BACK",
@@ -1211,6 +1252,7 @@ async function applySiteSourceRollback(body, auth, env) {
     executor: auth.actor,
     deploymentExpected: true,
     deploymentCheckRecommended: true,
+    siteDeploymentDispatch,
     writePerformed: true,
   };
 }

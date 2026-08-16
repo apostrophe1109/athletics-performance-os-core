@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e4a3e535998544e4bd14bb48bc2c6011",
-  "generatedAt": "2026-08-14T23:16:35.607Z",
-  "baseCommitSha": "6a0220d604f019bd42170208de888acb0cdc3949",
-  "changeReason": "ユーザーが画像Previewの状態を承認したため、APOS View公式OriginのCORS許可修正を反映する。",
+  "deploymentId": "SITEDEPLOY_12aa60ac5059438799a3a6ac3057b140",
+  "generatedAt": "2026-08-16T03:29:41.448Z",
+  "baseCommitSha": "7435087090cf4e58ff6e9ec8ac0b7a502c1d306c",
+  "changeReason": "承認済み再Previewを反映し、site/のSource変更後にdeploy-site.ymlを明示dispatchする公開反映経路を修正する。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "d4b2ea7c40e5b1fb4ddafa3d9f5768e6df3b83b5fe050cbd1a4b5d114d01b8fa"
+      "contentHash": "4cc70d87d0f12b7d8ffb445f79757fea27329d6a2088165f03c847c10d74f390"
     }
   ]
 }
