@@ -66,34 +66,25 @@ def main():
     if manifest_key not in original_file_keys:
         raise RuntimeError("Required appsscript/JSON manifest was not found; refusing to update project")
 
-    process_diag = {"available": False, "processes": []}
-    try:
-        process_query = urllib.parse.urlencode({
-            "scriptId": script_id,
-            "scriptProcessFilter.deploymentId": deployment_id,
-            "pageSize": 20,
-        })
-        process_payload = http_json(
-            f"{SCRIPT_API}/processes:listScriptProcesses?{process_query}",
-            token=token,
-        )
-        process_diag = {
-            "available": True,
-            "processes": [
-                {
-                    "functionName": p.get("functionName"),
-                    "processType": p.get("processType"),
-                    "processStatus": p.get("processStatus"),
-                    "userAccessLevel": p.get("userAccessLevel"),
-                    "startTime": p.get("startTime"),
-                    "duration": p.get("duration"),
-                }
-                for p in (process_payload.get("processes") or [])[:20]
-            ],
-        }
-    except Exception as exc:
-        process_diag = {"available": False, "error": str(exc), "processes": []}
-    raise RuntimeError("APOS_PROCESS_DIAG " + json.dumps(process_diag, ensure_ascii=False, sort_keys=True))
+    configured_sheet_id = ""
+    marker = "SPREADSHEET_ID: '"
+    marker_pos = source.find(marker)
+    if marker_pos >= 0:
+        start = marker_pos + len(marker)
+        end = source.find("'", start)
+        if end > start:
+            configured_sheet_id = source[start:end]
+    project_diag = http_json(
+        f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}",
+        token=token,
+    )
+    parent_id = str(project_diag.get("parentId") or "").strip()
+    safe_diag = {
+        "hasParentId": bool(parent_id),
+        "configuredSpreadsheetIdFound": bool(configured_sheet_id),
+        "parentMatchesConfiguredSpreadsheet": bool(parent_id and configured_sheet_id and parent_id == configured_sheet_id),
+    }
+    raise RuntimeError("APOS_PARENT_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
 
     target = None
     for f in files:
