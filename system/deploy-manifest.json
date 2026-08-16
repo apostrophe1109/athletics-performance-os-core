@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_898eb69ff7e948e8af1bc4637a5f7367",
-  "generatedAt": "2026-08-16T19:31:19.499Z",
-  "baseCommitSha": "85af8143f0bd2c0fc0676a42d617a527ae4e6787",
-  "changeReason": "認証障害を完遂修正するため、署名検証とSpreadsheet health処理を分離するREAD専用診断を追加する。",
+  "deploymentId": "SITEDEPLOY_0b829794fd6e41078281672a9b429e24",
+  "generatedAt": "2026-08-16T19:34:32.013Z",
+  "baseCommitSha": "c78cd174646f444eb9ac52901eb332bce4fd9280",
+  "changeReason": "認証障害のSpreadsheet接続タイムアウト原因を特定するため、Apps Script Webアプリ設定・OAuth scopeを書込前に安全診断する。",
   "files": [
     {
-      "path": "system/worker.js",
+      "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "d9fe91b52568013ab4156a15eb7de9c236e6b1e218e07f73a18096cddba11729"
+      "contentHash": "120d9dfc4184a9b7f38b0c16fe847ba2d8a05a11a6f39d105832cadf7d22f672"
     }
   ]
 }
