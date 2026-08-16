@@ -188,7 +188,7 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "advanced", "openfile", "openurl"]:
+        for probe_mode in ["drive", "advanced"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
@@ -202,7 +202,9 @@ def main():
                         "httpStatus": response.status,
                         "success": payload.get("success"),
                         "status": payload.get("status"),
+                        "code": payload.get("code"),
                         "errorType": payload.get("errorType"),
+                        "errorMessage": str(payload.get("errorMessage") or payload.get("error") or "")[:240] or None,
                         "elapsedSeconds": round(time.time() - started, 2),
                     }
             except Exception as exc:
