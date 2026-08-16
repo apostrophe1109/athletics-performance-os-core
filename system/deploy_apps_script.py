@@ -66,27 +66,34 @@ def main():
     if manifest_key not in original_file_keys:
         raise RuntimeError("Required appsscript/JSON manifest was not found; refusing to update project")
 
-    manifest_file = next((f for f in files if (f.get("name"), f.get("type")) == manifest_key), None)
+    process_diag = {"available": False, "processes": []}
     try:
-        manifest_data = json.loads((manifest_file or {}).get("source") or "{}")
-    except Exception:
-        manifest_data = {}
-    current_deployment_diag = http_json(
-        f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
-        token=token,
-    )
-    web_entry_config = None
-    for entry in current_deployment_diag.get("entryPoints") or []:
-        if entry.get("entryPointType") == "WEB_APP":
-            web_entry_config = ((entry.get("webApp") or {}).get("entryPointConfig") or {})
-            break
-    safe_diag = {
-        "manifestWebapp": manifest_data.get("webapp"),
-        "oauthScopes": manifest_data.get("oauthScopes") or [],
-        "runtimeVersion": manifest_data.get("runtimeVersion"),
-        "deploymentWebApp": web_entry_config,
-    }
-    raise RuntimeError("APOS_RUNTIME_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
+        process_query = urllib.parse.urlencode({
+            "scriptId": script_id,
+            "scriptProcessFilter.deploymentId": deployment_id,
+            "pageSize": 20,
+        })
+        process_payload = http_json(
+            f"{SCRIPT_API}/processes:listScriptProcesses?{process_query}",
+            token=token,
+        )
+        process_diag = {
+            "available": True,
+            "processes": [
+                {
+                    "functionName": p.get("functionName"),
+                    "processType": p.get("processType"),
+                    "processStatus": p.get("processStatus"),
+                    "userAccessLevel": p.get("userAccessLevel"),
+                    "startTime": p.get("startTime"),
+                    "duration": p.get("duration"),
+                }
+                for p in (process_payload.get("processes") or [])[:20]
+            ],
+        }
+    except Exception as exc:
+        process_diag = {"available": False, "error": str(exc), "processes": []}
+    raise RuntimeError("APOS_PROCESS_DIAG " + json.dumps(process_diag, ensure_ascii=False, sort_keys=True))
 
     target = None
     for f in files:
