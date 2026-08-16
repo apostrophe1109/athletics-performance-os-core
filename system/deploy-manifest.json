@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_12aa60ac5059438799a3a6ac3057b140",
-  "generatedAt": "2026-08-16T03:29:41.448Z",
-  "baseCommitSha": "7435087090cf4e58ff6e9ec8ac0b7a502c1d306c",
-  "changeReason": "承認済み再Previewを反映し、site/のSource変更後にdeploy-site.ymlを明示dispatchする公開反映経路を修正する。",
+  "deploymentId": "SITEDEPLOY_508827b886c74d16a6033de4691b6133",
+  "generatedAt": "2026-08-16T03:47:35.465Z",
+  "baseCommitSha": "c54ad4c24445d62e9a681d99625994ef99576de9",
+  "changeReason": "公開4ファイルのHash一致まで確認する厳格なdeployment verifyへ修正し、誤った反映完了判定を防ぐ。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "4cc70d87d0f12b7d8ffb445f79757fea27329d6a2088165f03c847c10d74f390"
+      "contentHash": "01726732bff29ee0fc9f4d6f29887c1db25db6bc872b6f86b8ceefbfbf86e6b0"
     }
   ]
 }

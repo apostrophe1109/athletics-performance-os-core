@@ -1124,21 +1124,48 @@ async function getSiteDeploymentStatus(body, env) {
   if (!deploymentId) throw Object.assign(new Error("deploymentIdが必要です。"), { code: "DEPLOYMENT_ID_REQUIRED", status: 400 });
   const publicUrl = sitePublicUrl(env);
   if (!publicUrl) throw Object.assign(new Error("APOS_SITE_PUBLIC_URLを設定してください。"), { code: "SITE_PUBLIC_URL_NOT_CONFIGURED", status: 503 });
+  const cacheBust = String(Date.now());
   const manifestUrl = new URL("deploy-manifest.json", publicUrl);
-  manifestUrl.searchParams.set("_apos", String(Date.now()));
+  manifestUrl.searchParams.set("_apos", cacheBust);
   const response = await fetch(manifestUrl.toString(), { headers: { accept: "application/json", "cache-control": "no-cache" } });
   if (!response.ok) {
     return { success: true, status: "DEPLOYMENT_PENDING", deploymentId, publicUrl, httpStatus: response.status, writePerformed: false };
   }
   const manifest = await response.json().catch(() => null);
-  const deployed = manifest && String(manifest.deploymentId || "") === deploymentId;
+  const manifestMatched = Boolean(manifest && String(manifest.deploymentId || "") === deploymentId);
+
+  const root = siteSourceRoot(env);
+  const criticalRelativePaths = ["index.html", "app.js", "styles.css", "ui-layout.json"];
+  const deploymentChecks = [];
+  for (const relativePath of criticalRelativePaths) {
+    const sourcePath = validateSiteSourcePath(`${root}/${relativePath}`, env);
+    const source = await readGitHubSourceFile(sourcePath, env);
+    const publicFileUrl = new URL(relativePath, publicUrl);
+    publicFileUrl.searchParams.set("_apos", cacheBust);
+    const publicResponse = await fetch(publicFileUrl.toString(), { headers: { "cache-control": "no-cache" } });
+    const publicContent = publicResponse.ok ? await publicResponse.text() : "";
+    const sourceHash = source.exists ? await sha256Hex(source.content) : null;
+    const publicHash = publicResponse.ok ? await sha256Hex(publicContent) : null;
+    deploymentChecks.push({
+      path: relativePath,
+      httpStatus: publicResponse.status,
+      sourceHash,
+      publicHash,
+      matched: Boolean(source.exists && publicResponse.ok && sourceHash === publicHash),
+    });
+  }
+  const filesMatched = deploymentChecks.every(item => item.matched);
+  const deployed = manifestMatched && filesMatched;
   return {
     success: true,
     status: deployed ? "DEPLOYED" : "DEPLOYMENT_PENDING",
     deploymentId,
     publicUrl,
     observedDeploymentId: manifest?.deploymentId || null,
-    manifest: deployed ? manifest : null,
+    manifestMatched,
+    filesMatched,
+    deploymentChecks,
+    manifest: manifestMatched ? manifest : null,
     writePerformed: false,
   };
 }
