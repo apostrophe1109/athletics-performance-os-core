@@ -26,6 +26,13 @@ const state = {
   competitionLoaded: false,
   secondaryLoaded: false,
   backgroundLoading: false,
+  secondaryView: "history",
+  exerciseSearchQuery: "",
+  exerciseSearchResults: null,
+  exerciseSearchLoading: false,
+  exerciseSearchError: "",
+  measurementTrendsLoaded: false,
+  measurementLoading: false,
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 state.selectedDate = state.today;
@@ -160,14 +167,7 @@ async function loadDayContext(date, { force = false } = {}) {
 
 function renderDashboard() {
   dashboard.replaceChildren();
-  dashboard.append(renderTrainingWorkspace());
-  const lower = element("div", "secondary-grid");
-  lower.append(
-    renderHistory(),
-    renderExercises(),
-    renderMeasurements()
-  );
-  dashboard.append(lower);
+  dashboard.append(renderTrainingWorkspace(), renderSecondaryWorkspace());
   dashboard.setAttribute("aria-busy", "false");
 }
 
@@ -820,8 +820,74 @@ function monthMainText(session) {
   return session.title || session.purpose || session.role || "";
 }
 
+function renderSecondaryWorkspace() {
+  const shell = element("section", "secondary-workspace panel--wide");
+  const nav = element("nav", "secondary-tabs");
+  nav.setAttribute("aria-label", "データセクション");
+  [
+    ["history", "実施記録"],
+    ["exercises", "種目ライブラリ"],
+    ["measurements", "計測・コンディション"]
+  ].forEach(([view, label]) => {
+    const button = element("button", "secondary-tab", label);
+    button.type = "button";
+    button.dataset.active = String(state.secondaryView === view);
+    button.setAttribute("aria-pressed", String(state.secondaryView === view));
+    button.addEventListener("click", () => switchSecondaryView(view).catch(showFatalError));
+    nav.append(button);
+  });
+
+  const content = element("div", "secondary-content");
+  if (state.secondaryView === "exercises") content.append(renderExercises());
+  else if (state.secondaryView === "measurements") content.append(renderMeasurements());
+  else content.append(renderHistory());
+  shell.append(nav, content);
+  return shell;
+}
+
+async function switchSecondaryView(view) {
+  state.secondaryView = view;
+  if (view !== "measurements" || state.measurementTrendsLoaded || state.measurementLoading) {
+    renderDashboard();
+    return;
+  }
+  state.measurementLoading = true;
+  renderDashboard();
+  try {
+    const result = await records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 30);
+    state.measurements = result.records || [];
+    state.measurementTrendsLoaded = true;
+  } finally {
+    state.measurementLoading = false;
+    renderDashboard();
+  }
+}
+
+async function searchExerciseLibrary(query) {
+  const normalized = String(query || "").trim();
+  state.exerciseSearchQuery = normalized;
+  state.exerciseSearchError = "";
+  if (!normalized) {
+    state.exerciseSearchResults = null;
+    renderDashboard();
+    return;
+  }
+  state.exerciseSearchLoading = true;
+  renderDashboard();
+  try {
+    const result = await api("searchExercises", { query: normalized, includeArchived: false, limit: 20 });
+    state.exerciseSearchResults = result.results || [];
+  } catch (error) {
+    state.exerciseSearchResults = [];
+    state.exerciseSearchError = error?.message || "検索できませんでした。";
+  } finally {
+    state.exerciseSearchLoading = false;
+    renderDashboard();
+  }
+}
+
 function renderHistory() {
-  const panel = element("section", "panel");
+  const panel = element("section", "secondary-panel");
   panel.append(sectionHeader("最近の実施記録", "保存済み"));
   const list = element("div", "card-list");
   const items = state.executions.slice(0, 6);
@@ -839,30 +905,152 @@ function renderHistory() {
 }
 
 function renderExercises() {
-  const panel = element("section", "panel");
-  panel.append(sectionHeader("種目ライブラリ", state.secondaryLoaded ? `表示 ${state.exercises.length}件` : "読み込み中"));
-  const list = element("div", "card-list");
-  if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
-  state.exercises.slice(0, 6).forEach(item => {
-    list.append(recordCard(item.yukiName || item.generalName || item.exerciseId, item.category || "EXERCISE", [item.mainPurpose, item.initialPrescription].filter(Boolean).join(" / ")));
+  const panel = element("section", "secondary-panel");
+  const count = state.exerciseSearchResults === null ? state.exercises.length : state.exerciseSearchResults.length;
+  panel.append(sectionHeader("種目ライブラリ", state.exerciseSearchLoading ? "検索中" : `${count}件表示`));
+
+  const form = element("form", "exercise-search");
+  const input = element("input", "exercise-search__input");
+  input.type = "search";
+  input.value = state.exerciseSearchQuery;
+  input.placeholder = "種目名・別名・目的で検索";
+  input.setAttribute("aria-label", "種目ライブラリを検索");
+  const submit = element("button", "exercise-search__button", state.exerciseSearchLoading ? "検索中…" : "検索");
+  submit.type = "submit";
+  submit.disabled = state.exerciseSearchLoading;
+  form.append(input, submit);
+  if (state.exerciseSearchQuery) {
+    const clear = element("button", "exercise-search__clear", "クリア");
+    clear.type = "button";
+    clear.addEventListener("click", () => searchExerciseLibrary("").catch(showFatalError));
+    form.append(clear);
+  }
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    searchExerciseLibrary(input.value).catch(showFatalError);
   });
+  panel.append(form);
+
+  const list = element("div", "card-list exercise-results");
+  if (state.exerciseSearchLoading) {
+    list.append(empty("正本の種目マスターを検索しています…"));
+  } else if (state.exerciseSearchError) {
+    list.append(element("div", "error", state.exerciseSearchError));
+  } else {
+    const entries = state.exerciseSearchResults === null
+      ? state.exercises.slice(0, 6).map(exercise => ({ exercise, matchedFields: [] }))
+      : state.exerciseSearchResults;
+    if (!entries.length) list.append(empty("該当する種目はありません。別のキーワードを試してください。"));
+    entries.forEach(entry => {
+      const exercise = entry.exercise || entry;
+      const body = [
+        exercise.mainPurpose,
+        exercise.initialPrescription,
+        exercise.rest ? `休息 ${exercise.rest}` : ""
+      ].filter(Boolean).join(" / ");
+      const card = recordCard(
+        exercise.yukiName || exercise.generalName || exercise.exerciseId,
+        exercise.category || "EXERCISE",
+        body
+      );
+      if (entry.matchedFields?.length) {
+        card.append(element("p", "exercise-match", `一致: ${entry.matchedFields.join("・")}`));
+      }
+      list.append(card);
+    });
+  }
   panel.append(list);
   return panel;
 }
 
 function renderMeasurements() {
-  const panel = element("section", "panel");
-  panel.append(sectionHeader("計測記録", "実測値"));
-  const list = element("div", "card-list");
-  const items = state.measurements.slice(0, 6);
-  if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
-  else if (!items.length) list.append(empty("計測記録はまだありません。"));
-  items.forEach(item => {
-    const value = [item.measurementValue, item.unit].filter(value => value !== null && value !== undefined && value !== "").join(" ");
-    list.append(recordCard(item.measurementType || item.exerciseName || "計測", formatJapaneseDate(dateOnly(item.date)), [value, item.evaluation].filter(Boolean).join(" / ")));
-  });
+  const panel = element("section", "secondary-panel");
+  panel.append(sectionHeader("計測・コンディション", state.measurementTrendsLoaded ? "最大30件から推移表示" : "実測値"));
+  const list = element("div", "metric-grid");
+  if (state.measurementLoading) {
+    list.append(empty("計測データの推移を読み込み中…"));
+    panel.append(list);
+    return panel;
+  }
+  const groups = groupMeasurements(state.measurements);
+  if (!groups.length) list.append(empty("計測記録はまだありません。"));
+  groups.slice(0, 8).forEach(([type, items]) => list.append(measurementMetricCard(type, items)));
   panel.append(list);
   return panel;
+}
+
+function groupMeasurements(items) {
+  const groups = new Map();
+  items.forEach(item => {
+    const type = item.measurementType || item.exerciseName || "MEASUREMENT";
+    if (!groups.has(type)) groups.set(type, []);
+    groups.get(type).push(item);
+  });
+  return [...groups.entries()]
+    .map(([type, values]) => [type, values.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))])
+    .sort((a, b) => String(b[1].at(-1)?.date || "").localeCompare(String(a[1].at(-1)?.date || "")));
+}
+
+function measurementMetricCard(type, items) {
+  const latest = items.at(-1) || {};
+  const card = element("article", "metric-card");
+  const top = element("div", "metric-card__top");
+  top.append(
+    element("span", "metric-card__label", measurementLabel(type)),
+    element("span", "metric-card__date", formatJapaneseDate(dateOnly(latest.date)))
+  );
+  const value = element("div", "metric-card__value");
+  value.append(
+    element("strong", "", latest.measurementValue ?? "—"),
+    element("span", "", latest.unit || "")
+  );
+  card.append(top, value);
+
+  const numeric = items
+    .map(item => Number(item.measurementValue))
+    .filter(number => Number.isFinite(number));
+  if (numeric.length >= 2) card.append(measurementSparkline(numeric));
+  else card.append(element("p", "metric-card__note", "推移グラフは同じ項目が2点以上になると表示されます。"));
+  return card;
+}
+
+function measurementSparkline(values) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 240 56");
+  svg.setAttribute("class", "metric-sparkline");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "計測値の推移");
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? 120 : 6 + (index / (values.length - 1)) * 228;
+    const y = 48 - ((value - min) / range) * 40;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const line = document.createElementNS(ns, "polyline");
+  line.setAttribute("points", points);
+  line.setAttribute("class", "metric-sparkline__line");
+  svg.append(line);
+  return svg;
+}
+
+function measurementLabel(type) {
+  const labels = {
+    RESTING_HR: "安静時心拍数",
+    HRV: "HRV",
+    SLEEP_DURATION: "睡眠時間",
+    SLEEP_SCORE: "睡眠スコア",
+    ACTIVE_KCAL: "消費カロリー",
+    SPO2: "血中酸素",
+    BODY_TEMPERATURE: "体表温度",
+    TJ_JUMP_DISTANCE: "三段跳 跳躍距離",
+    TJ_RUNUP_STEP: "助走歩数",
+    CALF_CIRC: "ふくらはぎ周径",
+    FOREARM_CIRC: "前腕周径"
+  };
+  return labels[type] || String(type || "計測").replaceAll("_", " ");
 }
 
 function intensityCard(score) {
@@ -1129,7 +1317,9 @@ async function refreshVisibleData() {
     }
     state.competitionLoaded = false;
     state.secondaryLoaded = false;
+    state.measurementTrendsLoaded = false;
     await loadBackgroundData({ force: true });
+    if (state.secondaryView === "measurements") await switchSecondaryView("measurements");
     state.fetchedAt = new Date();
     setConnection("ready", "最新データ");
   } catch (error) {
