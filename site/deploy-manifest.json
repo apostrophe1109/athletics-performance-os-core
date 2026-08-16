@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_66e34e87677a47429e9a83dfba2dfd3b",
-  "generatedAt": "2026-08-16T03:33:12.619Z",
-  "baseCommitSha": "d07a8fee93f5419645ed88baf640799d7ca47340",
-  "changeReason": "新レイアウトを正式版2.0.0として確定し、修正済みWorkerからdeploy-site.ymlを明示起動してGitHub Pagesへ公開反映する。",
+  "deploymentId": "SITEDEPLOY_6efa8447646a4bc39b852571d50bd91e",
+  "generatedAt": "2026-08-16T03:39:54.343Z",
+  "baseCommitSha": "c921a0f1ad34c22d7470ce3fb1319eb6424dc279",
+  "changeReason": "新レイアウトを維持したままAPOS Core既存layout契約との互換性を回復するためsectionsを追加し、公開Workflow検証を通してGitHub Pagesへ反映する。",
   "files": [
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "426cf5d576a7ff0b100e7736a16e0845c32d9a5d2153e25adccd16f4833de727"
+      "contentHash": "5f9d6988bbd25eae0be3240edf72c69ff9eaa65af3015d3d0e84c5ecd0edf697"
     }
   ]
 }

@@ -24,5 +24,13 @@
       "writeEnabled": false
     }
   },
+  "sections": [
+    {"id":"today","type":"today","title":"今日のトレーニング"},
+    {"id":"week","type":"week","title":"今週のトレーニング"},
+    {"id":"month","type":"month","title":"月間トレーニング"},
+    {"id":"history","type":"history","title":"最近の実施記録"},
+    {"id":"exercise-library","type":"exerciseLibrary","title":"種目ライブラリ"},
+    {"id":"measurements","type":"measurements","title":"計測記録"}
+  ],
   "secondarySections": ["history", "exerciseLibrary", "measurements"]
 }
