@@ -56,6 +56,43 @@ def main():
     expected_source_sha256 = sha256_text(source)
     token = oauth_access_token()
 
+    configured_sheet_id = ""
+    marker = "SPREADSHEET_ID: '"
+    marker_pos = source.find(marker)
+    if marker_pos >= 0:
+        start = marker_pos + len(marker)
+        end = source.find("'", start)
+        if end > start:
+            configured_sheet_id = source[start:end]
+    if not configured_sheet_id:
+        raise RuntimeError("APOS_CI_SHEETS_DIAG configured spreadsheet id not found")
+
+    ci_diag = {}
+    tests = {
+        "metadata": f"https://sheets.googleapis.com/v4/spreadsheets/{urllib.parse.quote(configured_sheet_id)}?fields=spreadsheetId",
+        "values": f"https://sheets.googleapis.com/v4/spreadsheets/{urllib.parse.quote(configured_sheet_id)}/values/{urllib.parse.quote(chr(39) + '08_セッション' + chr(39) + '!A1:B3', safe='')}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING",
+    }
+    for test_name, test_url in tests.items():
+        req = urllib.request.Request(test_url, headers={"Accept":"application/json", "Authorization":f"Bearer {token}"}, method="GET")
+        started = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                raw = resp.read().decode("utf-8")
+                payload = json.loads(raw) if raw else {}
+                ci_diag[test_name] = {
+                    "success": True,
+                    "httpStatus": resp.status,
+                    "elapsedSeconds": round(time.time() - started, 2),
+                    "hasValues": bool(payload.get("values")) if test_name == "values" else None,
+                }
+        except Exception as exc:
+            ci_diag[test_name] = {
+                "success": False,
+                "errorType": type(exc).__name__,
+                "elapsedSeconds": round(time.time() - started, 2),
+            }
+    raise RuntimeError("APOS_CI_SHEETS_DIAG " + json.dumps(ci_diag, ensure_ascii=False, sort_keys=True))
+
     content = http_json(f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content", token=token)
     files = content.get("files")
     if not isinstance(files, list) or not files:

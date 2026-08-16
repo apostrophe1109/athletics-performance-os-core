@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_6de4b97bdff3469aaae3efc6e8960ad8",
-  "generatedAt": "2026-08-16T19:54:30.724Z",
-  "baseCommitSha": "7b3664ad26d6cb9d83dd49f7bf6ceb3cdf0c3322",
-  "changeReason": "認証障害修正を完遂するため、Advanced Sheets Spreadsheets.get(includeGridData)のセル読取経路を一時診断し元Codeとmanifestへ復元する。",
+  "deploymentId": "SITEDEPLOY_481011474e4645a4a30b72fdf177da50",
+  "generatedAt": "2026-08-16T19:57:25.974Z",
+  "baseCommitSha": "dffa87a75fe921a62c2ee5d8a9bf9521734fd700",
+  "changeReason": "認証障害修正を完遂するため、CI OAuthから元Spreadsheetのmetadataと少量セル値を直接READして障害範囲を確定する。",
   "files": [
     {
       "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "29deaa5458e4a76f1435defe8c05e84d4d8d82924f2bb75bcd85e824d0df2345"
+      "contentHash": "bbe6a8e87b274d135b203cac4d16083f429c6c6304cd5a36a623a5bbcd290230"
     }
   ]
 }
