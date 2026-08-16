@@ -10,15 +10,20 @@ const config = Object.freeze({
 const state = {
   layout: null,
   today: todayInTimezone(),
+  selectedDate: null,
+  viewMode: "day",
   context: null,
+  dayContext: null,
   sessions: [],
-  exercises: [],
   executions: [],
   measurements: [],
+  exercises: [],
+  events: [],
   profile: null,
   fetchedAt: null,
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
+state.selectedDate = state.today;
 
 const dashboard = document.querySelector("#dashboard");
 const connectionDot = document.querySelector("#connection-dot");
@@ -44,32 +49,562 @@ async function boot() {
     showLogin();
     return;
   }
-
   await loadDashboardData();
 }
 
 async function loadDashboardData() {
   showLoading();
-
   const month = monthRange(state.today);
-  const [context, sessions, exercises, executions, measurements, profiles] = await Promise.all([
+  const weekStart = startOfWeek(state.today);
+  const rangeStart = [month.start, weekStart].sort()[0];
+  const rangeEnd = [month.end, addDays(weekStart, 6)].sort().at(-1);
+
+  const [context, sessions, executions, measurements, exercises, profiles, events] = await Promise.all([
     api("getTrainingContext", { date: state.today, sportProfileId: config.sportProfileId, historyDays: 14 }),
-    records("sessions", { sessionDate: { $gte: month.start, $lte: month.end }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500),
-    records("exercises", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "yukiName", "ASC", 500),
+    records("sessions", { sessionDate: { $gte: rangeStart, $lte: rangeEnd }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500),
     records("executions", { sportProfileId: config.sportProfileId }, "executionDate", "DESC", 50),
     records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 50),
-    records("sportProfiles", { sportProfileId: config.sportProfileId }, "sportProfileId", "ASC", 1)
+    records("exercises", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "yukiName", "ASC", 500),
+    records("sportProfiles", { sportProfileId: config.sportProfileId }, "sportProfileId", "ASC", 1),
+    records("events", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "startDate", "ASC", 50)
   ]);
 
   state.context = context;
+  state.dayContext = context;
   state.sessions = sessions.records || [];
-  state.exercises = exercises.records || [];
   state.executions = executions.records || [];
   state.measurements = measurements.records || [];
+  state.exercises = exercises.records || [];
   state.profile = profiles.records?.[0] || null;
+  state.events = events.records || [];
   state.fetchedAt = new Date();
   renderDashboard();
   setConnection("ready", "最新データ");
+}
+
+async function loadDayContext(date) {
+  state.selectedDate = date;
+  setConnection("idle", "日別データ取得中");
+  try {
+    state.dayContext = await api("getTrainingContext", { date, sportProfileId: config.sportProfileId, historyDays: 14 });
+    state.viewMode = "day";
+    renderDashboard();
+    setConnection("ready", "最新データ");
+  } catch (error) {
+    setConnection("error", "取得エラー");
+    throw error;
+  }
+}
+
+function renderDashboard() {
+  dashboard.replaceChildren();
+  dashboard.append(renderTrainingWorkspace());
+  const lower = element("div", "secondary-grid");
+  lower.append(
+    renderHistory(),
+    renderExercises(),
+    renderMeasurements()
+  );
+  dashboard.append(lower);
+  dashboard.setAttribute("aria-busy", "false");
+}
+
+function renderTrainingWorkspace() {
+  const shell = element("section", "training-shell panel--wide");
+  shell.append(renderCompetitionStrip(), renderViewTabs());
+
+  const content = element("div", "view-content");
+  if (state.viewMode === "week") content.append(renderWeekView());
+  else if (state.viewMode === "month") content.append(renderMonthView());
+  else content.append(renderDayView());
+  shell.append(content);
+  return shell;
+}
+
+function renderCompetitionStrip() {
+  const strip = element("div", "competition-strip");
+  const event = nextCompetition();
+  const brand = element("div", "competition-strip__brand");
+  brand.append(
+    element("span", "eyebrow", state.profile?.sportName || "TRIPLE JUMP"),
+    element("strong", "", "今日のトレーニング")
+  );
+
+  const target = element("div", "competition-strip__target");
+  if (event) {
+    const days = daysBetween(state.today, dateOnly(event.startDate));
+    target.append(
+      element("span", "competition-strip__date", `次戦 ${formatShortDate(event.startDate)} ${event.startTime || ""}`.trim()),
+      element("span", "competition-strip__count", days >= 0 ? `あと ${days}日` : "終了")
+    );
+  } else {
+    target.append(element("span", "competition-strip__date", "次戦 未登録"));
+  }
+  strip.append(brand, target);
+  return strip;
+}
+
+function renderViewTabs() {
+  const nav = element("nav", "view-tabs");
+  nav.setAttribute("aria-label", "表示単位");
+  [
+    ["day", "日"],
+    ["week", "週"],
+    ["month", "月"]
+  ].forEach(([mode, label]) => {
+    const button = element("button", "view-tab", label);
+    button.type = "button";
+    button.dataset.active = String(state.viewMode === mode);
+    button.setAttribute("aria-pressed", String(state.viewMode === mode));
+    button.addEventListener("click", () => {
+      state.viewMode = mode;
+      if (mode === "day" && state.selectedDate !== state.today && !state.dayContext) state.selectedDate = state.today;
+      renderDashboard();
+    });
+    nav.append(button);
+  });
+  return nav;
+}
+
+function renderDayView() {
+  const wrap = element("div", "day-view");
+  const context = state.dayContext || state.context || {};
+  const sessions = context.sessions || [];
+  const menu = context.menuItems || [];
+  const primary = sessions[0] || null;
+  const intensity = sessionIntensity(primary);
+
+  const head = element("div", "day-head");
+  const copy = element("div");
+  copy.append(
+    element("span", "eyebrow eyebrow--cyan", `DAY / ${formatJapaneseDate(state.selectedDate)}`),
+    element("h2", "day-title", primary?.title || primary?.role || "登録済みセッションなし")
+  );
+  if (primary?.purpose) copy.append(element("p", "day-purpose", primary.purpose));
+
+  const strength = intensityCard(intensity);
+  head.append(copy, strength);
+  wrap.append(head);
+
+  if (primary) {
+    const concept = element("div", "concept-card");
+    concept.append(
+      element("span", "concept-card__label", "今日のコンセプト"),
+      element("strong", "", primary.purpose || primary.intent || primary.role || "計画どおりに実施")
+    );
+    wrap.append(concept);
+  }
+
+  const menuList = element("div", "menu-list");
+  if (!sessions.length) {
+    menuList.append(empty("この日の登録済みセッションはありません。"));
+  } else if (!menu.length) {
+    sessions.forEach((session, index) => {
+      menuList.append(menuItem(index + 1, session.title || session.role || "セッション", session.purpose || "", intensityText(sessionIntensity(session))));
+    });
+  } else {
+    menu.forEach((item, index) => {
+      const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
+      const subtitle = item.cue || item.purpose || "";
+      menuList.append(menuItem(index + 1, title, subtitle, doseText(item)));
+    });
+  }
+  wrap.append(menuList);
+
+  const stop = sessions.map(item => item.stopCondition).filter(Boolean).join(" / ");
+  if (stop) {
+    const note = element("div", "stop-note");
+    note.append(element("strong", "", "終了基準"), element("span", "", stop));
+    wrap.append(note);
+  }
+
+  wrap.append(renderRecordEntry());
+  return wrap;
+}
+
+function renderRecordEntry() {
+  const box = element("section", "record-entry");
+  const heading = element("div", "record-entry__head");
+  heading.append(
+    element("div", "", ""),
+    element("span", "eyebrow", "EXECUTION LOG")
+  );
+  heading.firstChild.append(
+    element("h3", "", "今日の実施記録"),
+    element("p", "", "音声でも手入力でもOK。保存前に内容を確認します。")
+  );
+
+  const actions = element("div", "record-actions");
+  const voice = element("button", "record-button record-button--voice", "●  音声で記録");
+  const manual = element("button", "record-button record-button--manual", "✎  手入力で記録");
+  voice.type = manual.type = "button";
+  voice.addEventListener("click", () => openRecordDialog("voice"));
+  manual.addEventListener("click", () => openRecordDialog("manual"));
+  actions.append(voice, manual);
+  box.append(heading, actions);
+
+  const privacy = element("p", "record-entry__note", "入力内容は承認するまでGoogle Sheetsへ保存しません。音声そのものは保存対象にしません。");
+  box.append(privacy);
+  return box;
+}
+
+function openRecordDialog(mode) {
+  const dialog = element("dialog", "record-dialog");
+  const form = element("form", "record-dialog__card");
+  form.method = "dialog";
+
+  const top = element("div", "record-dialog__top");
+  const title = element("div");
+  title.append(
+    element("span", "eyebrow eyebrow--cyan", mode === "voice" ? "VOICE INPUT" : "MANUAL INPUT"),
+    element("h3", "", mode === "voice" ? "音声で実施記録" : "手入力で実施記録")
+  );
+  const close = element("button", "icon-button", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", "閉じる");
+  close.addEventListener("click", () => dialog.close());
+  top.append(title, close);
+
+  const meta = element("div", "record-meta");
+  const primary = (state.dayContext?.sessions || [])[0];
+  meta.append(
+    metaItem("日付", formatJapaneseDate(state.selectedDate)),
+    metaItem("セッション", primary?.role || primary?.title || "—"),
+    metaItem("強度", intensityText(sessionIntensity(primary)))
+  );
+
+  const transcript = element("textarea", "record-textarea");
+  transcript.rows = 9;
+  transcript.placeholder = mode === "voice"
+    ? "ここに文字起こしが入ります。必要なら手で修正できます。"
+    : "例：ウォームアップはジョグ20分。バウンディング20mを2本。助走は良かったが、後半は少し脚が重かった。";
+  transcript.setAttribute("aria-label", "実施内容");
+
+  const voiceTools = element("div", "voice-tools");
+  let recognition = null;
+  let listening = false;
+  const voiceStatus = element("p", "voice-status", mode === "voice" ? "マイク開始ボタンを押してください。" : "");
+  if (mode === "voice") {
+    const mic = element("button", "mic-button", "●");
+    mic.type = "button";
+    const micLabel = element("span", "mic-label", "音声入力を開始");
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      mic.disabled = true;
+      micLabel.textContent = "このブラウザでは音声認識を利用できません。手入力をご利用ください。";
+    } else {
+      mic.addEventListener("click", () => {
+        if (listening) {
+          recognition?.stop();
+          return;
+        }
+        recognition = new Recognition();
+        recognition.lang = "ja-JP";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        let finalText = transcript.value;
+        recognition.onstart = () => {
+          listening = true;
+          mic.dataset.listening = "true";
+          micLabel.textContent = "録音中…タップで停止";
+          voiceStatus.textContent = "話した内容をリアルタイムで文字にしています。";
+        };
+        recognition.onresult = event => {
+          let interim = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const value = event.results[i][0]?.transcript || "";
+            if (event.results[i].isFinal) finalText += `${value}。`;
+            else interim += value;
+          }
+          transcript.value = `${finalText}${interim}`;
+        };
+        recognition.onerror = event => {
+          voiceStatus.textContent = `音声認識を終了しました: ${event.error || "不明なエラー"}`;
+        };
+        recognition.onend = () => {
+          listening = false;
+          mic.dataset.listening = "false";
+          micLabel.textContent = "音声入力を再開";
+        };
+        recognition.start();
+      });
+    }
+    voiceTools.append(mic, micLabel, voiceStatus);
+  }
+
+  const organize = element("button", "organize-button", "内容を整理する");
+  organize.type = "button";
+  const preview = element("div", "draft-preview");
+  preview.hidden = true;
+  const save = element("button", "approve-button", "承認して保存");
+  save.type = "button";
+  save.disabled = true;
+  const systemNote = element("p", "draft-system-note", "");
+
+  organize.addEventListener("click", () => {
+    const value = transcript.value.trim();
+    if (!value) {
+      systemNote.textContent = "実施内容を入力してください。";
+      return;
+    }
+    const draft = summarizeLocally(value);
+    preview.replaceChildren(
+      element("span", "eyebrow", "SAVE PREVIEW"),
+      element("h4", "", "保存前の確認"),
+      draftList("実施内容", draft.actions),
+      draftList("良かった点・気づき", draft.notes)
+    );
+    preview.hidden = false;
+    systemNote.textContent = "この画面ではまだ保存されません。内容を確認・修正してください。";
+    save.disabled = false;
+  });
+
+  save.addEventListener("click", () => {
+    systemNote.textContent = "現在のAPOS Viewは閲覧専用です。実データ保存はAPOS Coreの書込機能を追加し、Preview→承認→Apply→Verifyを通す実装後に有効化します。";
+  });
+
+  form.append(top, meta);
+  if (mode === "voice") form.append(voiceTools);
+  form.append(transcript, organize, preview, save, systemNote);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => {
+    try { recognition?.stop(); } catch {}
+    dialog.remove();
+  });
+  dialog.showModal();
+}
+
+function summarizeLocally(text) {
+  const chunks = text
+    .split(/[。！？\n]+/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  const noteWords = /良|痛|重|軽|疲|違和感|感覚|調子|でき|難|安定|課題|気づ/;
+  const actions = chunks.filter(value => !noteWords.test(value)).slice(0, 8);
+  const notes = chunks.filter(value => noteWords.test(value)).slice(0, 6);
+  return {
+    actions: actions.length ? actions : chunks.slice(0, 8),
+    notes: notes.length ? notes : ["必要に応じて追記してください。"]
+  };
+}
+
+function draftList(title, items) {
+  const group = element("div", "draft-group");
+  group.append(element("strong", "", title));
+  const list = element("ul");
+  items.forEach(item => list.append(element("li", "", item)));
+  group.append(list);
+  return group;
+}
+
+function renderWeekView() {
+  const wrap = element("div", "week-view");
+  const start = startOfWeek(state.selectedDate || state.today);
+  const dates = Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  const header = sectionHeader("今週のトレーニング", `${formatJapaneseDate(dates[0])} – ${formatJapaneseDate(dates[6])}`);
+  const scores = dates.map(date => daySessions(date).map(sessionIntensity).filter(value => value !== null)).flat();
+  const average = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "—";
+  header.append(pill(`週平均 ${average}/10`, true));
+  wrap.append(header);
+
+  const list = element("div", "week-list");
+  dates.forEach(date => {
+    const sessions = daySessions(date);
+    const primary = sessions[0] || null;
+    const score = sessionIntensity(primary);
+    const card = element("button", "week-day");
+    card.type = "button";
+    card.dataset.today = String(date === state.today);
+    card.append(
+      element("span", "week-day__date", `${date.slice(8)} ${weekdayName(date)}`),
+      element("span", "week-day__body", primary?.title || primary?.role || "予定なし"),
+      intensityMini(score)
+    );
+    if (primary?.purpose) card.append(element("span", "week-day__sub", primary.purpose));
+    card.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
+    list.append(card);
+  });
+  wrap.append(list);
+  return wrap;
+}
+
+function renderMonthView() {
+  const wrap = element("div", "month-view");
+  const [year, month] = (state.selectedDate || state.today).split("-").map(Number);
+  wrap.append(sectionHeader("月間トレーニング", `${year}年${month}月`));
+
+  const grid = element("div", "month-grid");
+  ["月", "火", "水", "木", "金", "土", "日"].forEach(label => grid.append(element("div", "month-label", label)));
+
+  const first = `${year}-${pad(month)}-01`;
+  const lead = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7;
+  for (let i = 0; i < lead; i++) grid.append(element("div", "month-day month-day--empty"));
+
+  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  for (let day = 1; day <= count; day++) {
+    const date = `${year}-${pad(month)}-${pad(day)}`;
+    const sessions = daySessions(date);
+    const score = sessionIntensity(sessions[0] || null);
+    const cell = element("button", "month-day");
+    cell.type = "button";
+    cell.dataset.today = String(date === state.today);
+    cell.append(element("span", "month-day__number", String(day)));
+    if (score !== null) cell.append(intensityMini(score));
+    if (sessions[0]) cell.append(element("span", "month-day__role", sessions[0].role || shortLabel(sessions[0].title || "PLAN")));
+    cell.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
+    grid.append(cell);
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+function renderHistory() {
+  const panel = element("section", "panel");
+  panel.append(sectionHeader("最近の実施記録", "保存済み"));
+  const list = element("div", "card-list");
+  const items = state.executions.slice(0, 6);
+  if (!items.length) list.append(empty("実施記録はまだありません。"));
+  items.forEach(item => {
+    list.append(recordCard(
+      item.exerciseName || item.exerciseId || "実施記録",
+      formatJapaneseDate(dateOnly(item.executionDate)),
+      [item.successes, item.improvements, item.voiceTranscriptNormalized].filter(Boolean).join(" / ")
+    ));
+  });
+  panel.append(list);
+  return panel;
+}
+
+function renderExercises() {
+  const panel = element("section", "panel");
+  panel.append(sectionHeader("種目ライブラリ", `${state.exercises.length}種目`));
+  const list = element("div", "card-list");
+  state.exercises.slice(0, 6).forEach(item => {
+    list.append(recordCard(item.yukiName || item.generalName || item.exerciseId, item.category || "EXERCISE", [item.mainPurpose, item.initialPrescription].filter(Boolean).join(" / ")));
+  });
+  panel.append(list);
+  return panel;
+}
+
+function renderMeasurements() {
+  const panel = element("section", "panel");
+  panel.append(sectionHeader("計測記録", "実測値"));
+  const list = element("div", "card-list");
+  const items = state.measurements.slice(0, 6);
+  if (!items.length) list.append(empty("計測記録はまだありません。"));
+  items.forEach(item => {
+    const value = [item.measurementValue, item.unit].filter(value => value !== null && value !== undefined && value !== "").join(" ");
+    list.append(recordCard(item.measurementType || item.exerciseName || "計測", formatJapaneseDate(dateOnly(item.date)), [value, item.evaluation].filter(Boolean).join(" / ")));
+  });
+  panel.append(list);
+  return panel;
+}
+
+function intensityCard(score) {
+  const box = element("div", "intensity-card");
+  box.append(
+    element("span", "intensity-card__label", "練習強度"),
+    element("strong", "", score === null ? "— / 10" : `${score} / 10`)
+  );
+  const track = element("span", "intensity-track");
+  const fill = element("span", "intensity-track__fill");
+  fill.style.width = `${score === null ? 0 : score * 10}%`;
+  track.append(fill);
+  box.append(track);
+  return box;
+}
+
+function intensityMini(score) {
+  return element("span", "intensity-mini", score === null ? "—/10" : `${score}/10`);
+}
+
+function sessionIntensity(session) {
+  if (!session) return null;
+  const raw = String(session.intensity || session.role || "").toUpperCase().replace(/[・〜~_\s]/g, "-");
+  if (!raw) return null;
+  if (raw.includes("MAX") || raw.includes("PERFORMANCE") || raw.includes("COMPETITION")) return 10;
+  if (raw.includes("HIGH") && raw.includes("MEDIUM")) return 8;
+  if (raw.includes("HIGH")) return 9;
+  if (raw.includes("SHARP")) return 6;
+  if (raw.includes("MEDIUM")) return 6;
+  if (raw.includes("LOW") && raw.includes("MEDIUM")) return 5;
+  if (raw.includes("LOW")) return 3;
+  if (raw.includes("REST") || raw.includes("RECOVERY")) return 1;
+  return 5;
+}
+
+function intensityText(score) {
+  return score === null ? "— / 10" : `${score} / 10`;
+}
+
+function doseText(item) {
+  return [
+    item.durationSec && `${item.durationSec}秒`,
+    item.distanceM && `${item.distanceM}m`,
+    item.reps && `${item.reps}回`,
+    item.sets && `${item.sets}セット`,
+    item.weightKg && `${item.weightKg}kg`
+  ].filter(Boolean).join(" × ") || "—";
+}
+
+function menuItem(index, title, subtitle, dose) {
+  const row = element("article", "menu-item");
+  row.append(element("span", "menu-item__index", pad(index)));
+  const copy = element("div", "menu-item__copy");
+  copy.append(element("strong", "", title));
+  if (subtitle) copy.append(element("span", "", subtitle));
+  row.append(copy, element("span", "menu-item__dose", dose || "—"));
+  return row;
+}
+
+function metaItem(label, value) {
+  const item = element("div", "meta-item");
+  item.append(element("span", "", label), element("strong", "", value || "—"));
+  return item;
+}
+
+function daySessions(date) {
+  return state.sessions.filter(session => dateOnly(session.sessionDate) === date && session.planStatus !== "ARCHIVED");
+}
+
+function nextCompetition() {
+  return state.events
+    .filter(event => event.eventType === "COMPETITION" && dateOnly(event.startDate) >= state.today && event.status !== "ARCHIVED")
+    .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)))[0] || null;
+}
+
+function sectionHeader(title, note) {
+  const head = element("div", "section-head");
+  const copy = element("div");
+  copy.append(element("h2", "", title));
+  if (note) copy.append(element("span", "section-note", note));
+  head.append(copy);
+  return head;
+}
+
+function recordCard(title, badge, body) {
+  const card = element("article", "record-card");
+  const top = element("div", "record-card__top");
+  top.append(element("h3", "", String(title || "—")), pill(String(badge || ""), true));
+  card.append(top);
+  if (body) card.append(element("p", "", String(body)));
+  return card;
+}
+
+function pill(text, muted = false) {
+  return element("span", `pill${muted ? " pill--muted" : ""}`, text);
+}
+
+function empty(message) {
+  return element("div", "empty", message);
+}
+
+function element(tag, className = "", text = null) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== null && text !== undefined) node.textContent = String(text);
+  return node;
 }
 
 async function verifyWebSession() {
@@ -166,9 +701,7 @@ function assertConfigured() {
 async function loadLayout() {
   const response = await fetch("./ui-layout.json", { cache: "no-store", credentials: "same-origin" });
   if (!response.ok) throw new Error("サイト表示構成を読み込めませんでした。");
-  const layout = await response.json();
-  if (!layout || !Array.isArray(layout.sections)) throw new Error("ui-layout.jsonの形式が正しくありません。");
-  return layout;
+  return response.json();
 }
 
 async function api(action, payload = {}) {
@@ -209,209 +742,10 @@ function records(entity, filters, sortBy, sortDirection, limit) {
   return api("getRecords", { entity, filters, sortBy, sortDirection, offset: 0, limit });
 }
 
-function renderDashboard() {
-  dashboard.replaceChildren();
-  const renderers = {
-    hero: renderHero,
-    today: renderToday,
-    week: renderWeek,
-    month: renderMonth,
-    exerciseLibrary: renderExercises,
-    history: renderHistory,
-    measurements: renderMeasurements,
-    customText: renderCustomText
-  };
-
-  state.layout.sections.filter(section => section.visible !== false).forEach(section => {
-    const renderer = renderers[section.type];
-    if (renderer) dashboard.append(renderer(section));
-  });
-  dashboard.setAttribute("aria-busy", "false");
-}
-
-function renderHero(section) {
-  const panel = createPanel(section, "panel--wide panel--hero");
-  const kicker = element("div", "hero-kicker", state.profile?.sportName || "TRIPLE JUMP");
-  const title = element("div", "hero-title", section.title || "18m30への現在地");
-  const copy = element("p", "hero-copy", state.layout.subtitle || "Google Sheetsの正式データを、毎日の判断につながる形で表示します。");
-  panel.append(kicker, title, copy);
-  const metrics = element("div", "metric-grid");
-  const goal = numberOrText(state.profile?.targetValue, "18.30");
-  const current = numberOrText(state.profile?.personalBest, "—");
-  metrics.append(
-    metric(`${goal}m`, "最終目標"),
-    metric(current === "—" ? current : `${current}m`, "自己記録"),
-    metric(String(state.context?.trainingRules?.length || 0), "有効な設計ルール"),
-    metric(formatDateTime(state.fetchedAt), "最終同期")
-  );
-  panel.append(metrics);
-  return panel;
-}
-
-function renderToday(section) {
-  const panel = createPanel(section, "panel--wide");
-  panel.append(sectionHeader(section.title || "今日のトレーニング", formatJapaneseDate(state.today)));
-  const list = element("div", "card-list");
-  const sessions = state.context?.sessions || [];
-  const menu = state.context?.menuItems || [];
-  if (!sessions.length) list.append(empty("今日の登録済みセッションはありません。"));
-  sessions.forEach(session => {
-    const card = element("article", "record-card");
-    const top = element("div", "record-card__top");
-    top.append(element("h3", "", session.title || session.role || "セッション"), pill(session.role || session.intensity || "PLAN"));
-    card.append(top);
-    if (section.options?.showPurpose !== false && session.purpose) card.append(element("p", "", session.purpose));
-    const items = menu.filter(item => String(item.sessionId) === String(session.sessionId));
-    items.forEach(item => {
-      const dose = [item.sets && `${item.sets}set`, item.reps && `${item.reps}rep`, item.distanceM && `${item.distanceM}m`, item.durationSec && `${item.durationSec}s`, item.weightKg && `${item.weightKg}kg`].filter(Boolean).join(" / ");
-      const description = [item.exerciseNameSnapshot, section.options?.showDose !== false ? dose : "", item.cue].filter(Boolean).join(" — ");
-      card.append(element("p", "", description));
-    });
-    if (section.options?.showStopCondition !== false && session.stopCondition) card.append(element("p", "", `終了基準: ${session.stopCondition}`));
-    list.append(card);
-  });
-  panel.append(list);
-  return panel;
-}
-
-function renderWeek(section) {
-  const panel = createPanel(section, "panel--wide");
-  const start = startOfWeek(state.today);
-  const days = Array.from({ length: Number(section.options?.days || 7) }, (_, index) => addDays(start, index));
-  panel.append(sectionHeader(section.title || "今週の見通し", `${formatJapaneseDate(days[0])} – ${formatJapaneseDate(days.at(-1))}`));
-  const grid = element("div", "week-grid");
-  days.forEach(date => {
-    const day = element("div", "day");
-    day.dataset.today = String(date === state.today);
-    day.append(element("span", "day__date", date.slice(5).replace("-", "/")), element("span", "day__name", weekdayName(date)));
-    const items = state.sessions.filter(session => dateOnly(session.sessionDate) === date && session.planStatus !== "ARCHIVED");
-    if (!items.length) day.append(element("span", "day__item", "—"));
-    items.forEach(item => day.append(element("span", "day__item", item.title || item.role || "予定")));
-    grid.append(day);
-  });
-  panel.append(grid);
-  return panel;
-}
-
-function renderMonth(section) {
-  const panel = createPanel(section, "panel--wide");
-  const [year, month] = state.today.split("-").map(Number);
-  panel.append(sectionHeader(section.title || "月間計画", `${year}年${month}月`));
-  const grid = element("div", "month-grid");
-  ["月", "火", "水", "木", "金", "土", "日"].forEach(label => grid.append(element("div", "month-label", label)));
-  const first = `${year}-${pad(month)}-01`;
-  const lead = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7;
-  for (let i = 0; i < lead; i++) grid.append(element("div", "month-day"));
-  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  for (let day = 1; day <= count; day++) {
-    const date = `${year}-${pad(month)}-${pad(day)}`;
-    const cell = element("div", "month-day", String(day));
-    const matches = state.sessions.filter(session => dateOnly(session.sessionDate) === date && session.planStatus !== "ARCHIVED");
-    if (matches.length) {
-      cell.dataset.active = "true";
-      cell.title = matches.map(item => item.title || item.role || "予定").join(" / ");
-      cell.append(element("span", "month-day__dot"));
-    }
-    grid.append(cell);
-  }
-  panel.append(grid);
-  return panel;
-}
-
-function renderExercises(section) {
-  const panel = createPanel(section, "panel--wide");
-  const head = sectionHeader(section.title || "種目ライブラリ", `${state.exercises.length}種目`);
-  let query = "";
-  if (section.options?.showSearch !== false) {
-    const input = element("input", "search");
-    input.type = "search";
-    input.placeholder = "種目名・目的・能力で検索";
-    input.setAttribute("aria-label", "種目ライブラリを検索");
-    head.append(input);
-    input.addEventListener("input", () => { query = input.value.trim().toLowerCase(); update(); });
-  }
-  panel.append(head);
-  const list = element("div", "card-list");
-  panel.append(list);
-  const update = () => {
-    list.replaceChildren();
-    const limit = Number(section.options?.limit || 12);
-    const filtered = state.exercises.filter(item => [item.yukiName, item.generalName, item.aliases, item.mainPurpose, item.targetAbility].join(" ").toLowerCase().includes(query)).slice(0, limit);
-    if (!filtered.length) list.append(empty("一致する種目がありません。"));
-    filtered.forEach(item => list.append(recordCard(item.yukiName || item.generalName || item.exerciseId, item.category || "EXERCISE", [item.mainPurpose, item.initialPrescription, item.cue].filter(Boolean).join(" / "))));
-  };
-  update();
-  return panel;
-}
-
-function renderHistory(section) {
-  const panel = createPanel(section);
-  panel.append(sectionHeader(section.title || "最近の実施記録", "保存済みの構造化記録"));
-  const list = element("div", "card-list");
-  const items = state.executions.slice(0, Number(section.options?.limit || 10));
-  if (!items.length) list.append(empty("実施記録はまだありません。"));
-  items.forEach(item => list.append(recordCard(item.exerciseName || item.exerciseId || "実施記録", formatJapaneseDate(dateOnly(item.executionDate)), [item.successes, item.improvements, item.voiceTranscriptNormalized].filter(Boolean).join(" / "))));
-  panel.append(list);
-  return panel;
-}
-
-function renderMeasurements(section) {
-  const panel = createPanel(section);
-  panel.append(sectionHeader(section.title || "計測記録", "候補ではなく実測値のみ"));
-  const list = element("div", "card-list");
-  const items = state.measurements.slice(0, Number(section.options?.limit || 8));
-  if (!items.length) list.append(empty("計測記録はまだありません。"));
-  items.forEach(item => {
-    const value = [item.measurementValue, item.unit].filter(value => value !== null && value !== undefined && value !== "").join(" ");
-    list.append(recordCard(item.measurementType || item.exerciseName || "計測", formatJapaneseDate(dateOnly(item.date)), [value, item.evaluation].filter(Boolean).join(" / ")));
-  });
-  panel.append(list);
-  return panel;
-}
-
-function renderCustomText(section) {
-  const panel = createPanel(section, "panel--wide");
-  panel.append(sectionHeader(section.title || "お知らせ", ""), element("p", "hero-copy", String(section.options?.text || "")));
-  return panel;
-}
-
-function createPanel(section, extraClass = "") {
-  const panel = element("section", `panel ${extraClass}`.trim());
-  panel.dataset.sectionId = String(section.id || "");
-  return panel;
-}
-
-function sectionHeader(title, note) {
-  const head = element("div", "section-head");
-  head.append(element("h2", "", title));
-  if (note) head.append(element("span", "section-note", note));
-  return head;
-}
-
-function recordCard(title, badge, body) {
-  const card = element("article", "record-card");
-  const top = element("div", "record-card__top");
-  top.append(element("h3", "", String(title || "—")), pill(String(badge || ""), true));
-  card.append(top);
-  if (body) card.append(element("p", "", String(body)));
-  return card;
-}
-
-function pill(text, muted = false) { return element("span", `pill${muted ? " pill--muted" : ""}`, text); }
-function metric(value, label) { const card = element("div", "metric"); card.append(element("span", "metric__value", value), element("span", "metric__label", label)); return card; }
-function empty(message) { return element("div", "empty", message); }
-
-function element(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== null && text !== undefined) node.textContent = String(text);
-  return node;
-}
-
 function showLoading() {
   dashboard.replaceChildren();
   const template = document.querySelector("#loading-template");
-  for (let i = 0; i < 4; i++) dashboard.append(template.content.cloneNode(true));
+  for (let i = 0; i < 3; i++) dashboard.append(template.content.cloneNode(true));
 }
 
 function showFatalError(error) {
@@ -424,7 +758,10 @@ function showFatalError(error) {
   setConnection("error", "接続エラー");
 }
 
-function setConnection(stateName, label) { connectionDot.dataset.state = stateName; connectionLabel.textContent = label; }
+function setConnection(stateName, label) {
+  connectionDot.dataset.state = stateName;
+  connectionLabel.textContent = label;
+}
 
 function applyTheme(theme) {
   const variables = { accent: "--accent", accentSecondary: "--accent-2", surface: "--surface", background: "--background", text: "--text", muted: "--muted" };
@@ -458,11 +795,37 @@ function addDays(date, amount) {
 
 function monthRange(date) {
   const [year, month] = date.split("-").map(Number);
-  return { start: `${year}-${pad(month)}-01`, end: `${year}-${pad(month)}-${pad(new Date(Date.UTC(year, month, 0)).getUTCDate())}` };
+  return {
+    start: `${year}-${pad(month)}-01`,
+    end: `${year}-${pad(month)}-${pad(new Date(Date.UTC(year, month, 0)).getUTCDate())}`
+  };
 }
 
-function weekdayName(date) { return new Intl.DateTimeFormat(config.locale, { weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`)); }
-function formatJapaneseDate(date) { if (!date) return "—"; return new Intl.DateTimeFormat(config.locale, { month: "numeric", day: "numeric", weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`)); }
-function formatDateTime(date) { return date ? new Intl.DateTimeFormat(config.locale, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: config.timezone }).format(date) : "—"; }
-function numberOrText(value, fallback) { return value === null || value === undefined || value === "" ? fallback : String(value); }
-function pad(value) { return String(value).padStart(2, "0"); }
+function daysBetween(a, b) {
+  return Math.round((new Date(`${b}T00:00:00Z`) - new Date(`${a}T00:00:00Z`)) / 86400000);
+}
+
+function weekdayName(date) {
+  return new Intl.DateTimeFormat(config.locale, { weekday: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+}
+
+function formatJapaneseDate(date) {
+  if (!date) return "—";
+  return new Intl.DateTimeFormat(config.locale, { month: "numeric", day: "numeric", weekday: "short", timeZone: "UTC" }).format(new Date(`${dateOnly(date)}T00:00:00Z`));
+}
+
+function formatShortDate(date) {
+  const value = dateOnly(date);
+  if (!value) return "—";
+  const [, month, day] = value.split("-");
+  return `${Number(month)}/${Number(day)}`;
+}
+
+function shortLabel(value) {
+  const text = String(value || "");
+  return text.length > 7 ? `${text.slice(0, 7)}…` : text;
+}
+
+function pad(value) {
+  return String(value).padStart(2, "0");
+}
