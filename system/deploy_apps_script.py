@@ -86,6 +86,20 @@ def main():
         var ss3 = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/' + APOS_CONFIG.SPREADSHEET_ID + '/edit');
         if (ss3.getId() !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
         ss3.getSheets().length;
+      } else if (mode === 'advanced') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var meta = Sheets.Spreadsheets.get(APOS_CONFIG.SPREADSHEET_ID, { fields: 'spreadsheetId' });
+        if (!meta || meta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+      } else if (mode === 'rest') {
+        var token = ScriptApp.getOAuthToken();
+        var response = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '?fields=spreadsheetId', {
+          method: 'get',
+          headers: { Authorization: 'Bearer ' + token },
+          muteHttpExceptions: true
+        });
+        if (response.getResponseCode() !== 200) throw new Error('SHEETS_REST_HTTP_' + response.getResponseCode());
+        var restMeta = JSON.parse(response.getContentText() || '{}');
+        if (restMeta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
       } else {
         return APOS_json_({ success: false, status: 'PROBE_MODE_INVALID', mode: mode });
       }
@@ -161,7 +175,7 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe")
         time.sleep(2)
-        for probe_mode in ["drive", "openfile", "openurl"]:
+        for probe_mode in ["drive", "advanced", "rest", "openfile", "openurl"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
