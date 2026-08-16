@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.5
+ * Version: 1.4.6
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.5";
+const VERSION = "1.4.6";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1528,7 +1528,6 @@ async function dispatchAppsScriptDeploymentOnce(commitSha, env) {
       ref: config.branch,
       inputs: {
         mode: "deploy",
-        expected_commit_sha: commitSha,
       },
     },
     code: "MAINTENANCE_DEPLOYMENT_DISPATCH_FAILED",
