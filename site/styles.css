@@ -50,6 +50,24 @@ button { -webkit-tap-highlight-color: transparent; }
 .connection__dot { width: 8px; height: 8px; border-radius: 50%; background: #f9c74f; }
 .connection__dot[data-state="ready"] { background: var(--accent); }
 .connection__dot[data-state="error"] { background: var(--danger); }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.refresh-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: var(--accent-2);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255,255,255,.035);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.refresh-button:active { transform: scale(.96); }
+.refresh-button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
 .dashboard {
   width: min(1120px, 100%);
@@ -313,6 +331,9 @@ button { -webkit-tap-highlight-color: transparent; }
     padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
   }
   .topbar h1 { font-size: 1.05rem; }
+  .topbar-actions { gap: 7px; }
+  .connection { font-size: .68rem; }
+  .refresh-button { width: 40px; height: 40px; font-size: 1.25rem; }
   .dashboard { gap: 12px; padding: 12px max(10px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
   .training-shell { border-radius: 18px; }
   .competition-strip { padding: 14px; gap: 10px; }

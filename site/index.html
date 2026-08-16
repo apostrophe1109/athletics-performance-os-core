@@ -10,7 +10,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Athletics Performance OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260816h">
+    <link rel="stylesheet" href="./styles.css?v=20260816i">
   </head>
   <body>
     <a class="skip-link" href="#dashboard">本文へ移動</a>
@@ -18,11 +18,13 @@
       <div>
         <p class="eyebrow">APOSTROPHE / ATHLETICS PERFORMANCE OS</p>
         <h1 id="site-title">Athletics Performance OS</h1>
-        <p class="eyebrow" aria-label="build version">APOS v2.3.0</p>
       </div>
-      <div class="connection" aria-live="polite">
-        <span id="connection-dot" class="connection__dot"></span>
-        <span id="connection-label">接続中</span>
+      <div class="topbar-actions">
+        <div class="connection" aria-live="polite">
+          <span id="connection-dot" class="connection__dot"></span>
+          <span id="connection-label">接続中</span>
+        </div>
+        <button id="refresh-button" class="refresh-button" type="button" aria-label="最新データに更新" title="最新データに更新">↻</button>
       </div>
     </header>
 
@@ -43,6 +45,6 @@
       });
     </script>
     <script src="./config.js?v=20260816f"></script>
-    <script type="module" src="./app.js?v=20260816h"></script>
+    <script type="module" src="./app.js?v=20260816i"></script>
   </body>
 </html>

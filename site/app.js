@@ -28,6 +28,8 @@ state.selectedDate = state.today;
 const dashboard = document.querySelector("#dashboard");
 const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
+const refreshButton = document.querySelector("#refresh-button");
+refreshButton?.addEventListener("click", () => window.location.reload());
 
 boot().catch(error => {
   if (error?.code === "WEB_AUTH_REQUIRED") showLogin("セッションの有効期限が切れました。もう一度認証してください。");
@@ -225,7 +227,7 @@ function renderDayMenuSections(context, sessions) {
   const heading = element("div", "day-menu__heading");
   heading.append(
     element("span", "eyebrow", "TODAY'S MENU"),
-    element("h3", "", "今日やること")
+    element("h3", "", "その日の練習内容")
   );
   panel.append(heading);
 
@@ -235,39 +237,26 @@ function renderDayMenuSections(context, sessions) {
     return panel;
   }
 
-  const sections = [
-    ["warmup", "ウォーミングアップ"],
-    ["primer", "ドリル／神経プライマー"],
-    ["sprint", "スプリント／助走速度"],
-    ["main", "メイン"],
-    ["supplemental", "補強"],
-    ["cooldown", "クールダウン"],
-    ["other", "その他"]
-  ];
+  const block = element("section", "day-menu-section");
+  const blockHead = element("div", "day-menu-section__head");
+  blockHead.append(
+    element("span", "day-menu-section__dot", ""),
+    element("strong", "", "実行する順番"),
+    element("span", "day-menu-section__count", `${entries.length}項目`)
+  );
 
-  sections.forEach(([key, label]) => {
-    const items = entries.filter(item => item.section === key);
-    if (!items.length) return;
-    const block = element("section", "day-menu-section");
-    const blockHead = element("div", "day-menu-section__head");
-    blockHead.append(
-      element("span", "day-menu-section__dot", ""),
-      element("strong", "", label),
-      element("span", "day-menu-section__count", `${items.length}項目`)
-    );
-    const list = element("ul", "day-menu-section__list");
-    items.forEach(item => {
-      const row = element("li", "day-menu-row");
-      const copy = element("div", "day-menu-row__copy");
-      copy.append(element("strong", "", item.title));
-      if (item.detail) copy.append(element("span", "", item.detail));
-      row.append(copy);
-      if (item.dose) row.append(element("span", "day-menu-row__dose", item.dose));
-      list.append(row);
-    });
-    block.append(blockHead, list);
-    panel.append(block);
+  const list = element("ul", "day-menu-section__list");
+  entries.forEach((item, index) => {
+    const row = element("li", "day-menu-row");
+    const copy = element("div", "day-menu-row__copy");
+    copy.append(element("strong", "", `${index + 1}. ${item.title}`));
+    if (item.detail) copy.append(element("span", "", item.detail));
+    row.append(copy);
+    if (item.dose) row.append(element("span", "day-menu-row__dose", item.dose));
+    list.append(row);
   });
+  block.append(blockHead, list);
+  panel.append(block);
   return panel;
 }
 

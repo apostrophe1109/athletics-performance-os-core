@@ -1,29 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_83fb898b831d4a5fa1f27287365f596e",
-  "generatedAt": "2026-08-16T05:47:59.326Z",
-  "baseCommitSha": "b835addeaddd5468d458f5420456a33429ab7e38",
-  "changeReason": "承認済みの週・月表示改善を反映する。週表示は各日カードに日付・主目的ラベル・強度・メインメニュー最大3件・その日の意図を固定表示して一目で把握できるようにする。月表示は7列カレンダーを維持し、各日セルに短い主目的ラベルとメイン内容最大2件を表示する。",
+  "deploymentId": "SITEDEPLOY_0352f066a3f84e8686670e21077399c3",
+  "generatedAt": "2026-08-16T14:09:29.721Z",
+  "baseCommitSha": "0df16ca8bc26cdab1137ce826a2e147fddddf39c",
+  "changeReason": "承認済み画像プレビューどおり、実行順表示・バージョン名非表示・右上更新ボタンをサイトへ反映する。",
   "files": [
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "c1908996e7969887537ae076f54d56b977867440a64fe748bb8cf39d8ca26a73"
-    },
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "1ab1889c361e0be718e24eb2dcb0072dc1fabe11598138149d46136b26aa6d9c"
+      "contentHash": "b14e34fcf0fdec9d34b791cd2931bb0e8b0d79a65c371f244c02f4b7b0f62c79"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "cdc07cbdfcad6c94a02b8e1cfc0b3b81f113b58d6318c8bf4faa8e92cfc3c1b3"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "727a1d58a12a00250aa7093696b2bb3917bee9760967aceaf024ba77f4c6af8a"
-    },
-    {
-      "path": "site/ui-layout.json",
-      "operation": "UPSERT",
-      "contentHash": "e670cc30a6a4038f252018c2f64a26916cfbe04ee0e33cca2d4dc769e17acd06"
+      "contentHash": "967dad7578e37411fb30b9f34d46ea0f759167ae01140c3446714c9e2e1cd709"
     }
   ]
 }
