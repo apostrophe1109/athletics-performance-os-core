@@ -1,29 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9ef238ab59f04a95b25ebb29d0a98517",
-  "generatedAt": "2026-08-16T03:05:42.399Z",
-  "baseCommitSha": "a6ff3337e91d1ec408d9f8256cc21c922aa1ad40",
-  "changeReason": "承認済みPreviewを反映：日・週・月＋10段階強度、音声入力／手入力の実施記録UIを統合。Sheets実保存は無効のまま。",
+  "deploymentId": "SITEDEPLOY_66e34e87677a47429e9a83dfba2dfd3b",
+  "generatedAt": "2026-08-16T03:33:12.619Z",
+  "baseCommitSha": "d07a8fee93f5419645ed88baf640799d7ca47340",
+  "changeReason": "新レイアウトを正式版2.0.0として確定し、修正済みWorkerからdeploy-site.ymlを明示起動してGitHub Pagesへ公開反映する。",
   "files": [
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "9984582024a8cf51a709733f54500044ac551fefe0c9c6e494c361c30ba8bbf9"
-    },
-    {
-      "path": "site/app.js",
-      "operation": "UPSERT",
-      "contentHash": "5fa03d75392cfacb402f5d54c81a7231ebcb3f04ebadd0a47a2a57bd742dcb5d"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "7fd1a1ec3b6065b239dcb827dd1f90f8256d6f2c18df3c7b545e370f07aec045"
-    },
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "eb28d9a5591ead75269c57435abdc27ed3e9725625ae8ee8cdfe77fbacc3fdaa"
+      "contentHash": "426cf5d576a7ff0b100e7736a16e0845c32d9a5d2153e25adccd16f4833de727"
     }
   ]
 }
