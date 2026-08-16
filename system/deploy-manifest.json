@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_8a207896140343df9411ec2588436005",
-  "generatedAt": "2026-08-16T18:59:17.987Z",
-  "baseCommitSha": "3049f11528d497ddf52140020f7e27e51032de6a",
-  "changeReason": "承認済みのApps Script再デプロイ復旧を反映し、認証バックエンド到達性を回復する。",
+  "deploymentId": "SITEDEPLOY_29de81f1b14b418981862bc8d0767ff2",
+  "generatedAt": "2026-08-16T19:09:25.073Z",
+  "baseCommitSha": "6634b21b0db14c559ce387e51fbd8af8ffb30f16",
+  "changeReason": "認証障害修正を完遂するため、Apps Script Maintenance Applyの自動GitHub Actions dispatchを有効化する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "477e490f6b30a83221b4eea81e5d9d5a40ea920c8ab491cb47664afb0cdb11bf"
+      "contentHash": "c5c8fecba87bbfaa15a4aae67c0ecaa956ce76645977adb7b8ef9447c712e691"
     }
   ]
 }

@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.4
+ * Version: 1.4.5
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.4";
+const VERSION = "1.4.5";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1499,6 +1499,51 @@ async function dispatchWorkerDeploymentOnce(commitSha, env) {
   };
 }
 
+async function dispatchAppsScriptDeploymentOnce(commitSha, env) {
+  const spec = { kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Apps Script deploy @ " };
+  const existingRuns = await getDeploymentRunsForSpec(spec, commitSha, env);
+  if (existingRuns.length) {
+    const latest = existingRuns[0];
+    const failed = latest.status === "completed" && latest.conclusion && latest.conclusion !== "success";
+    return {
+      attempted: false,
+      status: failed ? "PREVIOUS_DISPATCH_FAILED" : (latest.status === "completed" ? "ALREADY_DEPLOYED" : "ALREADY_DISPATCHED"),
+      workflowFile: spec.workflowFile,
+      commitSha,
+      runId: latest.id || null,
+      runNumber: latest.run_number || null,
+      runStatus: latest.status || null,
+      conclusion: latest.conclusion || null,
+      retryPerformed: false,
+    };
+  }
+
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const response = await githubJson(`${repo}/actions/workflows/${encodeURIComponent(spec.workflowFile)}/dispatches`, env, {
+    write: true,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: {
+      ref: config.branch,
+      inputs: {
+        mode: "deploy",
+        expected_commit_sha: commitSha,
+      },
+    },
+    code: "MAINTENANCE_DEPLOYMENT_DISPATCH_FAILED",
+  });
+  return {
+    attempted: true,
+    status: "DISPATCHED",
+    workflowFile: spec.workflowFile,
+    commitSha,
+    runId: response?.workflow_run_id || null,
+    runUrl: response?.html_url || null,
+    retryPerformed: false,
+  };
+}
+
 async function maintenanceApply(body, auth, env) {
   const operation = normalizeMaintenanceOperation(body.operation);
   if (!MAINTENANCE_APPLY_OPERATIONS.has(operation)) {
@@ -1543,14 +1588,19 @@ async function maintenanceApply(body, auth, env) {
   }
 
   if (expectedDeployments.includes("APPS_SCRIPT")) {
-    deploymentDispatches.push({
-      attempted: false,
-      status: "MANUAL_GATE_RETAINED",
-      workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE,
-      commitSha: result.commitSha || null,
-      reason: "Apps Script deployment remains manual until its deployment read-back limitation is separately cleared.",
-      retryPerformed: false,
-    });
+    try {
+      deploymentDispatches.push(await dispatchAppsScriptDeploymentOnce(String(result.commitSha || ""), env));
+    } catch (error) {
+      deploymentDispatches.push({
+        attempted: true,
+        status: "DISPATCH_FAILED",
+        workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE,
+        commitSha: result.commitSha || null,
+        code: error.code || "MAINTENANCE_DEPLOYMENT_DISPATCH_FAILED",
+        error: safeErrorMessage(error),
+        retryPerformed: false,
+      });
+    }
   }
 
   const dispatchFailed = deploymentDispatches.some(item => item.status === "DISPATCH_FAILED" || item.status === "PREVIOUS_DISPATCH_FAILED");
