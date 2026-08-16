@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_d47cad7b859745eda83cbfa5f6922f25",
-  "generatedAt": "2026-08-16T19:21:14.550Z",
-  "baseCommitSha": "bd93e4ff99f9b8ca61b6a32e5f0ea35d0a5b3ea7",
-  "changeReason": "認証障害復旧のためApps Script deployment read-backを型正規化＋GETポーリングへ修正し、書込再送なしでversion反映を検証する。",
+  "deploymentId": "SITEDEPLOY_fecafeb51ecf4d508de46426c4b8e884",
+  "generatedAt": "2026-08-16T19:25:00.323Z",
+  "baseCommitSha": "2932f9b3442c97c06f10f07f5e5e82b81fb9aed3",
+  "changeReason": "認証障害修正を完遂するため、Apps Script URLとDeployment ID、HTTP応答を秘密値非開示で診断できるREAD専用機能を追加する。",
   "files": [
     {
-      "path": "system/deploy_apps_script.py",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "2f2c85d96aad5110f82d944da91412c99dd895d3733ccf8ff3a5c59ab008c2c9"
+      "contentHash": "8bf253f3004b28d7c06305036506bcef801cfa488ba87caaaaf2c2720582be6e"
     }
   ]
 }

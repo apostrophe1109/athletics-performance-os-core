@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.9
+ * Version: 1.4.10
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.9";
+const VERSION = "1.4.10";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1315,7 +1315,7 @@ function base64Utf8Decode(value) {
 }
 
 const MAINTENANCE_SOURCE_ROOT_DEFAULT = "system";
-const MAINTENANCE_READ_OPERATIONS = new Set(["SYSTEM_TREE", "SYSTEM_FILE", "RUNTIME_POLICY", "DEPLOYMENT_STATUS", "DEPLOYMENT_DIAGNOSTIC"]);
+const MAINTENANCE_READ_OPERATIONS = new Set(["SYSTEM_TREE", "SYSTEM_FILE", "RUNTIME_POLICY", "DEPLOYMENT_STATUS", "DEPLOYMENT_DIAGNOSTIC", "BACKEND_DIAGNOSTIC"]);
 const MAINTENANCE_PREVIEW_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
 const MAINTENANCE_APPLY_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
 
@@ -1413,6 +1413,80 @@ async function getMaintenanceDeploymentDiagnostic(payload, env) {
   return { success: true, status: "READY", runId, jobs, failedJobLogs, writePerformed: false };
 }
 
+async function getMaintenanceBackendDiagnostic(env) {
+  const normalizedUrl = normalizeAppsScriptUrl(requiredEnv(env, "APOS_APPS_SCRIPT_URL"));
+  const parsedUrl = new URL(normalizedUrl);
+  const urlMatch = parsedUrl.pathname.match(/^\/macros\/s\/([^/]+)\/exec\/?$/);
+  const urlDeploymentId = urlMatch ? String(urlMatch[1]) : "";
+
+  let repoDeploymentId = "";
+  let repoVariableReadable = true;
+  let repoVariableError = null;
+  try {
+    const config = siteRepositoryConfig(env);
+    const repo = githubRepoBase(config);
+    const variable = await githubJson(`${repo}/actions/variables/APOS_APPS_SCRIPT_DEPLOYMENT_ID`, env, { code: "MAINTENANCE_BACKEND_VARIABLE_READ_FAILED" });
+    repoDeploymentId = String(variable?.value || "").trim();
+  } catch (error) {
+    repoVariableReadable = false;
+    repoVariableError = { code: error.code || "MAINTENANCE_BACKEND_VARIABLE_READ_FAILED", error: safeErrorMessage(error) };
+  }
+
+  const requestId = `diag_${crypto.randomUUID()}`;
+  const envelope = await buildSignedEnvelope("health", {}, { id: "apostrophe", source: "MAINTENANCE" }, requestId, env);
+  let response = await fetch(normalizedUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8", accept: "application/json" },
+    body: JSON.stringify(envelope),
+    redirect: "manual",
+  });
+  const firstHttpStatus = response.status;
+  const location = response.headers.get("location");
+  let redirectHost = null;
+  let redirected = false;
+  if ([301, 302, 303, 307, 308].includes(response.status) && location) {
+    redirected = true;
+    try { redirectHost = new URL(location).hostname; } catch { redirectHost = "INVALID_REDIRECT_URL"; }
+    response = await fetch(location, { headers: { accept: "application/json" }, redirect: "follow" });
+  }
+
+  const text = await response.text();
+  let bodySummary = null;
+  try {
+    const parsed = JSON.parse(text);
+    bodySummary = {
+      json: true,
+      success: parsed?.success ?? null,
+      status: parsed?.status ?? null,
+      code: parsed?.code ?? null,
+      error: parsed?.error ? String(parsed.error).slice(0, 240) : null,
+    };
+  } catch {
+    bodySummary = {
+      json: false,
+      looksHtml: /^\s*(?:<!doctype|<html)/i.test(text),
+      chars: text.length,
+    };
+  }
+
+  return {
+    success: true,
+    status: "READY",
+    urlDeploymentIdSuffix: urlDeploymentId ? urlDeploymentId.slice(-8) : null,
+    repoDeploymentIdSuffix: repoDeploymentId ? repoDeploymentId.slice(-8) : null,
+    deploymentIdMatches: repoVariableReadable && repoDeploymentId ? urlDeploymentId === repoDeploymentId : null,
+    repoVariableReadable,
+    repoVariableError,
+    firstHttpStatus,
+    redirected,
+    redirectHost,
+    finalHttpStatus: response.status,
+    finalContentType: response.headers.get("content-type") || null,
+    bodySummary,
+    writePerformed: false,
+  };
+}
+
 async function maintenanceRead(body, auth, env) {
   const operation = normalizeMaintenanceOperation(body.operation);
   if (!MAINTENANCE_READ_OPERATIONS.has(operation)) {
@@ -1439,6 +1513,10 @@ async function maintenanceRead(body, auth, env) {
   }
   if (operation === "DEPLOYMENT_DIAGNOSTIC") {
     const result = await getMaintenanceDeploymentDiagnostic(payload, env);
+    return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM" };
+  }
+  if (operation === "BACKEND_DIAGNOSTIC") {
+    const result = await getMaintenanceBackendDiagnostic(env);
     return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM" };
   }
   return getMaintenanceDeploymentStatus(payload, env);
