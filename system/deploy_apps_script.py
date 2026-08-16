@@ -222,70 +222,97 @@ def main():
         raise RuntimeError("Diagnostic deployment version read-back did not converge")
 
     probe_results = {}
+    new_deployment_id = None
     restore_error = None
+    original_files = json.loads(json.dumps(files))
+    probe_files = json.loads(json.dumps(files))
+    probe_target = next((item for item in probe_files if item.get("name") == code_file_name and item.get("type") == "SERVER_JS"), None)
+    if probe_target is None:
+        raise RuntimeError("New deployment diagnostic target SERVER_JS was not found")
+    probe_target["source"] = probe_source
     try:
-        deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
-        time.sleep(2)
-        copy_id = None
-        make_url = (
-            f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
-            f"?action=__backendProbe&mode=makecopy"
+        http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
+            method="PUT",
+            body={"files": probe_files},
+            token=token,
+        )
+        probe_version = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/versions",
+            method="POST",
+            body={"description": "APOS fresh deployment backend diagnostic"},
+            token=token,
+        )
+        probe_version_number = probe_version.get("versionNumber")
+        if not isinstance(probe_version_number, int):
+            raise RuntimeError("Fresh deployment diagnostic versionNumber missing")
+        current_deployment = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
+            token=token,
+        )
+        manifest_name = (current_deployment.get("deploymentConfig") or {}).get("manifestFileName")
+        if not manifest_name:
+            raise RuntimeError("Fresh deployment diagnostic manifestFileName missing")
+        created = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments",
+            method="POST",
+            body={
+                "scriptId": script_id,
+                "versionNumber": probe_version_number,
+                "manifestFileName": manifest_name,
+                "description": "APOS fresh deployment backend diagnostic",
+            },
+            token=token,
+        )
+        new_deployment_id = str(created.get("deploymentId") or "").strip() or None
+        if not new_deployment_id:
+            raise RuntimeError("Fresh deployment diagnostic deploymentId missing")
+        time.sleep(3)
+        probe_url = (
+            f"https://script.google.com/macros/s/{urllib.parse.quote(new_deployment_id)}/exec"
+            f"?action=__backendProbe&mode=openfile"
         )
         started = time.time()
         try:
-            with urllib.request.urlopen(make_url, timeout=20) as response:
+            with urllib.request.urlopen(probe_url, timeout=20) as response:
                 raw = response.read().decode("utf-8")
                 payload = json.loads(raw) if raw else {}
-                copy_id = str(payload.get("copyId") or "").strip() or None
-                probe_results["makecopy"] = {
+                probe_results["freshDeploymentOpen"] = {
                     "httpStatus": response.status,
-                    "success": bool(payload.get("success") and copy_id),
+                    "success": payload.get("success"),
                     "status": payload.get("status"),
                     "elapsedSeconds": round(time.time() - started, 2),
-                    "copyIdStoredInternally": bool(copy_id),
                 }
         except Exception as exc:
-            probe_results["makecopy"] = {
+            probe_results["freshDeploymentOpen"] = {
                 "success": False,
                 "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
                 "errorType": type(exc).__name__,
                 "elapsedSeconds": round(time.time() - started, 2),
             }
-        if copy_id:
-            open_url = (
-                f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
-                f"?action=__backendProbe&mode=opencopy&copyId={urllib.parse.quote(copy_id)}"
-            )
-            started = time.time()
-            try:
-                with urllib.request.urlopen(open_url, timeout=20) as response:
-                    raw = response.read().decode("utf-8")
-                    payload = json.loads(raw) if raw else {}
-                    probe_results["opencopy"] = {
-                        "httpStatus": response.status,
-                        "success": payload.get("success"),
-                        "status": payload.get("status"),
-                        "sheetCount": payload.get("sheetCount"),
-                        "elapsedSeconds": round(time.time() - started, 2),
-                        "recoveryCandidateStored": payload.get("status") == "COPY_OPEN_OK",
-                    }
-            except Exception as exc:
-                probe_results["opencopy"] = {
-                    "success": False,
-                    "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
-                    "errorType": type(exc).__name__,
-                    "elapsedSeconds": round(time.time() - started, 2),
-                }
     finally:
         try:
-            deploy_source(original_source, "APOS restore after temporary backend probe")
+            http_json(
+                f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
+                method="PUT",
+                body={"files": original_files},
+                token=token,
+            )
         except Exception as exc:
             restore_error = str(exc)
 
-    safe_diag = {"probeResults": probe_results, "restoredOriginalSource": restore_error is None}
+    deployment_parts = []
+    if new_deployment_id:
+        deployment_parts = [new_deployment_id[i:i+24] for i in range(0, len(new_deployment_id), 24)]
+    safe_diag = {
+        "newDeploymentCreated": bool(new_deployment_id),
+        "deploymentIdParts": deployment_parts,
+        "probeResults": probe_results,
+        "projectContentRestored": restore_error is None,
+    }
     if restore_error:
         safe_diag["restoreError"] = restore_error
-    raise RuntimeError("APOS_OPEN_MODE_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
+    raise RuntimeError("APOS_FRESH_DEPLOY_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
 
     target = None
     for f in files:
