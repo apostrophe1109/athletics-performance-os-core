@@ -269,6 +269,7 @@ async function handleHealth(env, requestId, cors) {
       success: backend.success !== false,
       status: backend.status || "UNKNOWN",
       workerVersion: VERSION,
+      deploymentCommit: typeof env.APOS_DEPLOY_COMMIT === "string" ? env.APOS_DEPLOY_COMMIT : null,
       environment: env.APOS_ENVIRONMENT || "unset",
       configured,
       configStatus,
@@ -1335,6 +1336,100 @@ async function maintenancePreview(body, auth, env) {
   return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM", writePerformed: false };
 }
 
+const WORKER_DEPLOY_WORKFLOW_FILE = "apos-deploy-worker.yml";
+const APPS_SCRIPT_DEPLOY_WORKFLOW_FILE = "apos-deploy-apps-script.yml";
+
+async function getMaintenanceCommitChangedPaths(commitSha, env) {
+  const normalizedSha = String(commitSha || "").trim();
+  if (!/^[0-9a-f]{40}$/i.test(normalizedSha)) {
+    throw Object.assign(new Error("Maintenance commit SHAが不正です。"), { code: "MAINTENANCE_COMMIT_SHA_INVALID", status: 400 });
+  }
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const commit = await githubJson(`${repo}/commits/${encodeURIComponent(normalizedSha)}`, env, {
+    code: "MAINTENANCE_COMMIT_READ_FAILED",
+  });
+  const files = Array.isArray(commit?.files) ? commit.files : [];
+  return files
+    .map(file => String(file?.filename || ""))
+    .filter(Boolean);
+}
+
+function maintenanceDeploymentSpecsForPaths(paths, env) {
+  const root = maintenanceSourceRoot(env);
+  const changed = new Set(Array.isArray(paths) ? paths.map(path => String(path || "")) : []);
+  const specs = [];
+  if (changed.has(`${root}/worker.js`)) {
+    specs.push({ kind: "WORKER", workflowFile: WORKER_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Worker deploy @ " });
+  }
+  if (changed.has(`${root}/apps-script/Code.gs`)) {
+    specs.push({ kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Apps Script deploy @ " });
+  }
+  return specs;
+}
+
+async function getDeploymentRunsForSpec(spec, commitSha, env) {
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const workflowFile = encodeURIComponent(spec.workflowFile);
+  const data = await githubJson(
+    `${repo}/actions/workflows/${workflowFile}/runs?head_sha=${encodeURIComponent(commitSha)}&event=workflow_dispatch&per_page=20`,
+    env,
+    { code: "MAINTENANCE_DEPLOYMENT_STATUS_FAILED" }
+  );
+  const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
+  const expectedTitle = `${spec.runTitlePrefix}${commitSha}`;
+  return runs
+    .filter(run => String(run?.head_sha || "").toLowerCase() === commitSha.toLowerCase())
+    .filter(run => String(run?.display_title || "") === expectedTitle)
+    .sort((a, b) => Date.parse(String(b?.created_at || "")) - Date.parse(String(a?.created_at || "")));
+}
+
+async function dispatchWorkerDeploymentOnce(commitSha, env) {
+  const spec = { kind: "WORKER", workflowFile: WORKER_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Worker deploy @ " };
+  const existingRuns = await getDeploymentRunsForSpec(spec, commitSha, env);
+  if (existingRuns.length) {
+    const latest = existingRuns[0];
+    const failed = latest.status === "completed" && latest.conclusion && latest.conclusion !== "success";
+    return {
+      attempted: false,
+      status: failed ? "PREVIOUS_DISPATCH_FAILED" : (latest.status === "completed" ? "ALREADY_DEPLOYED" : "ALREADY_DISPATCHED"),
+      workflowFile: spec.workflowFile,
+      commitSha,
+      runId: latest.id || null,
+      runNumber: latest.run_number || null,
+      runStatus: latest.status || null,
+      conclusion: latest.conclusion || null,
+      retryPerformed: false,
+    };
+  }
+
+  const config = siteRepositoryConfig(env);
+  const repo = githubRepoBase(config);
+  const response = await githubJson(`${repo}/actions/workflows/${encodeURIComponent(spec.workflowFile)}/dispatches`, env, {
+    write: true,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: {
+      ref: config.branch,
+      inputs: {
+        mode: "deploy",
+        expected_commit_sha: commitSha,
+      },
+    },
+    code: "MAINTENANCE_DEPLOYMENT_DISPATCH_FAILED",
+  });
+  return {
+    attempted: true,
+    status: "DISPATCHED",
+    workflowFile: spec.workflowFile,
+    commitSha,
+    runId: response?.workflow_run_id || null,
+    runUrl: response?.html_url || null,
+    retryPerformed: false,
+  };
+}
+
 async function maintenanceApply(body, auth, env) {
   const operation = normalizeMaintenanceOperation(body.operation);
   if (!MAINTENANCE_APPLY_OPERATIONS.has(operation)) {
@@ -1346,17 +1441,60 @@ async function maintenanceApply(body, auth, env) {
   if (operation === "SYSTEM_SOURCE_CHANGE") result = await applySiteSourceChange(payload, auth, scopedEnv);
   else result = await applySiteSourceRollback(payload, auth, scopedEnv);
 
-  const changedPaths = Array.isArray(result.changedFiles) ? result.changedFiles.map(item => String(item.path || "")) : [];
-  const expectedDeployments = [];
-  const root = maintenanceSourceRoot(env);
-  if (changedPaths.includes(`${root}/worker.js`)) expectedDeployments.push("WORKER");
-  if (changedPaths.includes(`${root}/apps-script/Code.gs`)) expectedDeployments.push("APPS_SCRIPT");
+  let changedPaths = Array.isArray(result.changedFiles)
+    ? result.changedFiles.map(item => String(item.path || "")).filter(Boolean)
+    : [];
+  let changedPathReadError = null;
+  if (!changedPaths.length && /^[0-9a-f]{40}$/i.test(String(result.commitSha || ""))) {
+    try {
+      changedPaths = await getMaintenanceCommitChangedPaths(result.commitSha, env);
+    } catch (error) {
+      changedPathReadError = { code: error.code || "MAINTENANCE_COMMIT_READ_FAILED", error: safeErrorMessage(error) };
+    }
+  }
+
+  const deploymentSpecs = maintenanceDeploymentSpecsForPaths(changedPaths, env);
+  const expectedDeployments = deploymentSpecs.map(spec => spec.kind);
+  const deploymentDispatches = [];
+
+  if (expectedDeployments.includes("WORKER")) {
+    try {
+      deploymentDispatches.push(await dispatchWorkerDeploymentOnce(String(result.commitSha || ""), env));
+    } catch (error) {
+      deploymentDispatches.push({
+        attempted: true,
+        status: "DISPATCH_FAILED",
+        workflowFile: WORKER_DEPLOY_WORKFLOW_FILE,
+        commitSha: result.commitSha || null,
+        code: error.code || "MAINTENANCE_DEPLOYMENT_DISPATCH_FAILED",
+        error: safeErrorMessage(error),
+        retryPerformed: false,
+      });
+    }
+  }
+
+  if (expectedDeployments.includes("APPS_SCRIPT")) {
+    deploymentDispatches.push({
+      attempted: false,
+      status: "MANUAL_GATE_RETAINED",
+      workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE,
+      commitSha: result.commitSha || null,
+      reason: "Apps Script deployment remains manual until its deployment read-back limitation is separately cleared.",
+      retryPerformed: false,
+    });
+  }
+
+  const dispatchFailed = deploymentDispatches.some(item => item.status === "DISPATCH_FAILED" || item.status === "PREVIOUS_DISPATCH_FAILED");
   return {
     ...result,
     maintenanceOperation: operation,
     maintenanceDomain: "SYSTEM",
+    changedPaths,
+    changedPathReadError,
     expectedDeployments,
-    deploymentObservation: expectedDeployments.length ? "Call maintenanceRead with operation=DEPLOYMENT_STATUS and commitSha." : "NO_DEPLOYMENT_REQUIRED",
+    deploymentDispatches,
+    deploymentObservation: expectedDeployments.length ? "Call maintenanceRead with operation=DEPLOYMENT_STATUS and commitSha until the exact workflow run completes." : "NO_DEPLOYMENT_REQUIRED",
+    requiresManualDeployment: dispatchFailed || deploymentDispatches.some(item => item.status === "MANUAL_GATE_RETAINED"),
   };
 }
 
@@ -1365,31 +1503,57 @@ async function getMaintenanceDeploymentStatus(payload, env) {
   if (!/^[0-9a-f]{40}$/i.test(commitSha)) {
     throw Object.assign(new Error("DEPLOYMENT_STATUSにはcommitShaが必要です。"), { code: "MAINTENANCE_COMMIT_SHA_REQUIRED", status: 400 });
   }
-  const config = siteRepositoryConfig(env);
-  const repo = githubRepoBase(config);
-  const data = await githubJson(`${repo}/actions/runs?head_sha=${encodeURIComponent(commitSha)}&per_page=20`, env, {
-    code: "MAINTENANCE_DEPLOYMENT_STATUS_FAILED",
-  });
-  const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
-  const aposRuns = runs.filter(run => /^APOS Deploy\b/i.test(String(run.name || "")));
-  let status = "DEPLOYMENT_PENDING";
-  if (aposRuns.length) {
-    const completed = aposRuns.filter(run => run.status === "completed");
-    if (completed.some(run => run.conclusion && run.conclusion !== "success" && run.conclusion !== "skipped")) status = "DEPLOYMENT_FAILED";
-    else if (completed.length === aposRuns.length && completed.every(run => run.conclusion === "success" || run.conclusion === "skipped")) status = "DEPLOYED";
+
+  const changedPaths = await getMaintenanceCommitChangedPaths(commitSha, env);
+  const specs = maintenanceDeploymentSpecsForPaths(changedPaths, env);
+  if (!specs.length) {
+    return {
+      success: true,
+      status: "DEPLOYMENT_NOT_REQUIRED",
+      maintenanceOperation: "DEPLOYMENT_STATUS",
+      commitSha,
+      changedPaths,
+      expectedDeployments: [],
+      workflows: [],
+      writePerformed: false,
+    };
   }
+
+  const workflows = [];
+  for (const spec of specs) {
+    const runs = await getDeploymentRunsForSpec(spec, commitSha, env);
+    const latest = runs[0] || null;
+    let deploymentStatus = "DEPLOYMENT_PENDING";
+    if (latest?.status === "completed") {
+      deploymentStatus = latest.conclusion === "success" ? "DEPLOYED" : "DEPLOYMENT_FAILED";
+    }
+    workflows.push({
+      kind: spec.kind,
+      workflowFile: spec.workflowFile,
+      deploymentStatus,
+      runId: latest?.id || null,
+      name: latest?.name || null,
+      displayTitle: latest?.display_title || null,
+      headSha: latest?.head_sha || null,
+      status: latest?.status || null,
+      conclusion: latest?.conclusion || null,
+      runNumber: latest?.run_number || null,
+      updatedAt: latest?.updated_at || null,
+    });
+  }
+
+  let status = "DEPLOYMENT_PENDING";
+  if (workflows.some(item => item.deploymentStatus === "DEPLOYMENT_FAILED")) status = "DEPLOYMENT_FAILED";
+  else if (workflows.every(item => item.deploymentStatus === "DEPLOYED")) status = "DEPLOYED";
+
   return {
     success: status !== "DEPLOYMENT_FAILED",
     status,
     maintenanceOperation: "DEPLOYMENT_STATUS",
     commitSha,
-    workflows: aposRuns.map(run => ({
-      name: run.name,
-      status: run.status,
-      conclusion: run.conclusion || null,
-      runNumber: run.run_number,
-      updatedAt: run.updated_at,
-    })),
+    changedPaths,
+    expectedDeployments: specs.map(spec => spec.kind),
+    workflows,
     writePerformed: false,
   };
 }
@@ -1458,8 +1622,9 @@ function isAllowedOrigin(origin, env) {
   const allowed = new Set(csv(env.APOS_ALLOWED_ORIGINS));
   const publicUrl = sitePublicUrl(env);
   if (publicUrl) {
-    try { allowed.add(new URL(publicUrl).origin); }
-    catch {}
+    try {
+      allowed.add(new URL(publicUrl).origin);
+    } catch {}
   }
   return !origin || allowed.has(origin);
 }
