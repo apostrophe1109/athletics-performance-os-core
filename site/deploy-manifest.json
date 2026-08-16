@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_0352f066a3f84e8686670e21077399c3",
-  "generatedAt": "2026-08-16T14:09:29.721Z",
-  "baseCommitSha": "0df16ca8bc26cdab1137ce826a2e147fddddf39c",
-  "changeReason": "承認済み画像プレビューどおり、実行順表示・バージョン名非表示・右上更新ボタンをサイトへ反映する。",
+  "deploymentId": "SITEDEPLOY_130caa6ccdbf484f95a09cf033f4e26f",
+  "generatedAt": "2026-08-16T21:35:18.363Z",
+  "baseCommitSha": "1e257e57bb43fdba5daa5b002aa1102f3653a45d",
+  "changeReason": "承認済みのAPOS View高速化を反映する。初期表示を当日sessions優先、周辺データ遅延ロード、週/月オンデマンド取得、表示キャッシュ、更新ボタン部分更新へ変更する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "b14e34fcf0fdec9d34b791cd2931bb0e8b0d79a65c371f244c02f4b7b0f62c79"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "cdc07cbdfcad6c94a02b8e1cfc0b3b81f113b58d6318c8bf4faa8e92cfc3c1b3"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "967dad7578e37411fb30b9f34d46ea0f759167ae01140c3446714c9e2e1cd709"
+      "contentHash": "bb006bb94ec705a1de53e86a7efee601454424d8416b5b2b5d1d973c7f7d455a"
     }
   ]
 }

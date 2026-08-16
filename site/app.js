@@ -21,6 +21,11 @@ const state = {
   events: [],
   profile: null,
   fetchedAt: null,
+  dayCache: new Map(),
+  loadedSessionRanges: new Set(),
+  competitionLoaded: false,
+  secondaryLoaded: false,
+  backgroundLoading: false,
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 state.selectedDate = state.today;
@@ -29,7 +34,7 @@ const dashboard = document.querySelector("#dashboard");
 const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
 const refreshButton = document.querySelector("#refresh-button");
-refreshButton?.addEventListener("click", () => window.location.reload());
+refreshButton?.addEventListener("click", () => refreshVisibleData().catch(showFatalError));
 
 boot().catch(error => {
   if (error?.code === "WEB_AUTH_REQUIRED") showLogin("セッションの有効期限が切れました。もう一度認証してください。");
@@ -44,53 +49,108 @@ async function boot() {
   document.querySelector("#site-title").textContent = state.layout.siteTitle || "Athletics Performance OS";
   assertConfigured();
 
-  setConnection("idle", "認証確認中");
-  if (!state.webSessionToken || !await verifyWebSession()) {
-    state.webSessionToken = "";
-    sessionStorage.removeItem("aposWebSession");
+  if (!state.webSessionToken) {
     showLogin();
     return;
   }
+  setConnection("idle", "今日の練習を取得中");
   await loadDashboardData();
 }
 
 async function loadDashboardData() {
   showLoading();
-  const month = monthRange(state.today);
-  const weekStart = startOfWeek(state.today);
-  const rangeStart = [month.start, weekStart].sort()[0];
-  const rangeEnd = [month.end, addDays(weekStart, 6)].sort().at(-1);
+  state.selectedDate = state.today;
+  state.viewMode = "day";
+  await loadDayData(state.today, { force: true, render: false });
+  state.fetchedAt = new Date();
+  renderDashboard();
+  setConnection("ready", "今日を表示");
+  void loadBackgroundData();
+}
 
-  const [context, sessions, executions, measurements, exercises, profiles, events] = await Promise.all([
-    api("getTrainingContext", { date: state.today, historyDays: 14 }),
-    records("sessions", { sessionDate: { $gte: rangeStart, $lte: rangeEnd }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500),
-    records("executions", { sportProfileId: config.sportProfileId }, "executionDate", "DESC", 50),
-    records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 50),
-    records("exercises", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "yukiName", "ASC", 500),
-    records("sportProfiles", { sportProfileId: config.sportProfileId }, "sportProfileId", "ASC", 1),
-    records("events", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "startDate", "ASC", 50)
-  ]);
+async function loadDayData(date, { force = false, render = true } = {}) {
+  state.selectedDate = date;
+  const cached = state.dayCache.get(date);
+  if (!force && cached) {
+    state.dayContext = cached;
+    if (render) renderDashboard();
+    return cached;
+  }
 
-  state.context = context;
+  const result = await records(
+    "sessions",
+    { sessionDate: date, sportProfileId: config.sportProfileId },
+    "sessionDate",
+    "ASC",
+    20
+  );
+  const sessions = result.records || [];
+  replaceSessionsForRange(date, date, sessions);
+  const context = { sessions, menuItems: [] };
+  state.dayCache.set(date, context);
+  state.loadedSessionRanges.add(`${date}|${date}`);
   state.dayContext = context;
-  state.sessions = sessions.records || [];
+  if (render) renderDashboard();
+  return context;
+}
+
+async function loadCompetitionData() {
+  const [profiles, events] = await Promise.all([
+    records("sportProfiles", { sportProfileId: config.sportProfileId }, "sportProfileId", "ASC", 1),
+    records("events", { sportProfileId: config.sportProfileId, startDate: { $gte: state.today }, status: { $ne: "ARCHIVED" } }, "startDate", "ASC", 10)
+  ]);
+  state.profile = profiles.records?.[0] || null;
+  state.events = events.records || [];
+  state.competitionLoaded = true;
+  renderDashboard();
+}
+
+async function loadSecondaryData() {
+  const [executions, measurements, exercises] = await Promise.all([
+    records("executions", { sportProfileId: config.sportProfileId }, "executionDate", "DESC", 6),
+    records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 6),
+    records("exercises", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "yukiName", "ASC", 6)
+  ]);
   state.executions = executions.records || [];
   state.measurements = measurements.records || [];
   state.exercises = exercises.records || [];
-  state.profile = profiles.records?.[0] || null;
-  state.events = events.records || [];
+  state.secondaryLoaded = true;
   state.fetchedAt = new Date();
   renderDashboard();
-  setConnection("ready", "最新データ");
 }
 
-async function loadDayContext(date) {
+async function loadBackgroundData({ force = false } = {}) {
+  if (state.backgroundLoading) return;
+  if (!force && state.competitionLoaded && state.secondaryLoaded) return;
+  state.backgroundLoading = true;
+  try {
+    if (force || !state.competitionLoaded) await loadCompetitionData();
+    if (force || !state.secondaryLoaded) await loadSecondaryData();
+    setConnection("ready", "最新データ");
+  } catch (error) {
+    if (error?.code === "WEB_AUTH_REQUIRED") {
+      showLogin("セッションの有効期限が切れました。もう一度認証してください。");
+      return;
+    }
+    console.warn("background load failed", error);
+    setConnection("ready", "主要データ表示中");
+  } finally {
+    state.backgroundLoading = false;
+  }
+}
+
+async function loadDayContext(date, { force = false } = {}) {
   state.selectedDate = date;
+  state.viewMode = "day";
+  if (!force && state.dayCache.has(date)) {
+    state.dayContext = state.dayCache.get(date);
+    renderDashboard();
+    setConnection("ready", "キャッシュ表示");
+    return;
+  }
   setConnection("idle", "日別データ取得中");
   try {
-    state.dayContext = await api("getTrainingContext", { date, historyDays: 14 });
-    state.viewMode = "day";
-    renderDashboard();
+    await loadDayData(date, { force, render: true });
     setConnection("ready", "最新データ");
   } catch (error) {
     setConnection("error", "取得エラー");
@@ -133,7 +193,9 @@ function renderCompetitionStrip() {
   );
 
   const target = element("div", "competition-strip__target");
-  if (event) {
+  if (!state.competitionLoaded) {
+    target.append(element("span", "competition-strip__date", "次戦 読み込み中…"));
+  } else if (event) {
     const days = daysBetween(state.today, dateOnly(event.startDate));
     target.append(
       element("span", "competition-strip__date", `次戦 ${formatShortDate(event.startDate)} ${event.startTime || ""}`.trim()),
@@ -632,10 +694,29 @@ async function navigateToToday(mode) {
   setConnection("ready", "最新データ");
 }
 
-async function ensureSessionsForRange(start, end) {
-  const result = await records("sessions", { sessionDate: { $gte: start, $lte: end }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500);
-  const merged = new Map(state.sessions.map(item => [item.sessionId, item]));
-  (result.records || []).forEach(item => merged.set(item.sessionId, item));
+async function ensureSessionsForRange(start, end, { force = false } = {}) {
+  const rangeKey = `${start}|${end}`;
+  if (!force && state.loadedSessionRanges.has(rangeKey)) return;
+  setConnection("idle", "期間データ取得中");
+  const result = await records(
+    "sessions",
+    { sessionDate: { $gte: start, $lte: end }, sportProfileId: config.sportProfileId },
+    "sessionDate",
+    "ASC",
+    100
+  );
+  replaceSessionsForRange(start, end, result.records || []);
+  state.loadedSessionRanges.add(rangeKey);
+  setConnection("ready", "最新データ");
+}
+
+function replaceSessionsForRange(start, end, incoming) {
+  const outside = state.sessions.filter(item => {
+    const date = dateOnly(item.sessionDate);
+    return !date || date < start || date > end;
+  });
+  const merged = new Map(outside.map(item => [item.sessionId, item]));
+  incoming.forEach(item => merged.set(item.sessionId, item));
   state.sessions = [...merged.values()].sort((a, b) => String(a.sessionDate).localeCompare(String(b.sessionDate)));
 }
 
@@ -685,7 +766,8 @@ function renderHistory() {
   panel.append(sectionHeader("最近の実施記録", "保存済み"));
   const list = element("div", "card-list");
   const items = state.executions.slice(0, 6);
-  if (!items.length) list.append(empty("実施記録はまだありません。"));
+  if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
+  else if (!items.length) list.append(empty("実施記録はまだありません。"));
   items.forEach(item => {
     list.append(recordCard(
       item.exerciseName || item.exerciseId || "実施記録",
@@ -699,8 +781,9 @@ function renderHistory() {
 
 function renderExercises() {
   const panel = element("section", "panel");
-  panel.append(sectionHeader("種目ライブラリ", `${state.exercises.length}種目`));
+  panel.append(sectionHeader("種目ライブラリ", state.secondaryLoaded ? `表示 ${state.exercises.length}件` : "読み込み中"));
   const list = element("div", "card-list");
+  if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
   state.exercises.slice(0, 6).forEach(item => {
     list.append(recordCard(item.yukiName || item.generalName || item.exerciseId, item.category || "EXERCISE", [item.mainPurpose, item.initialPrescription].filter(Boolean).join(" / ")));
   });
@@ -713,7 +796,8 @@ function renderMeasurements() {
   panel.append(sectionHeader("計測記録", "実測値"));
   const list = element("div", "card-list");
   const items = state.measurements.slice(0, 6);
-  if (!items.length) list.append(empty("計測記録はまだありません。"));
+  if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
+  else if (!items.length) list.append(empty("計測記録はまだありません。"));
   items.forEach(item => {
     const value = [item.measurementValue, item.unit].filter(value => value !== null && value !== undefined && value !== "").join(" ");
     list.append(recordCard(item.measurementType || item.exerciseName || "計測", formatJapaneseDate(dateOnly(item.date)), [value, item.evaluation].filter(Boolean).join(" / ")));
@@ -961,6 +1045,44 @@ async function api(action, payload = {}) {
 
 function records(entity, filters, sortBy, sortDirection, limit) {
   return api("getRecords", { entity, filters, sortBy, sortDirection, offset: 0, limit });
+}
+
+async function refreshVisibleData() {
+  if (!state.webSessionToken) {
+    showLogin();
+    return;
+  }
+  refreshButton.disabled = true;
+  setConnection("idle", "更新中");
+  const date = state.selectedDate || state.today;
+  try {
+    if (state.viewMode === "day") {
+      state.dayCache.delete(date);
+      await loadDayContext(date, { force: true });
+    } else if (state.viewMode === "week") {
+      const start = startOfWeek(date);
+      await ensureSessionsForRange(start, addDays(start, 6), { force: true });
+      renderDashboard();
+    } else {
+      const range = monthRange(date);
+      await ensureSessionsForRange(range.start, range.end, { force: true });
+      renderDashboard();
+    }
+    state.competitionLoaded = false;
+    state.secondaryLoaded = false;
+    await loadBackgroundData({ force: true });
+    state.fetchedAt = new Date();
+    setConnection("ready", "最新データ");
+  } catch (error) {
+    if (error?.code === "WEB_AUTH_REQUIRED") {
+      showLogin("セッションの有効期限が切れました。もう一度認証してください。");
+      return;
+    }
+    setConnection("error", "更新エラー");
+    throw error;
+  } finally {
+    refreshButton.disabled = false;
+  }
 }
 
 function showLoading() {
