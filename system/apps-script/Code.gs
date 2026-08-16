@@ -1,7 +1,7 @@
 /**
  * Athletics Performance OS - Google Apps Script API
  * Version: 1.2.1
- * Runtime redeploy marker: 2026-08-17 auth/backend recovery
+ * Runtime redeploy marker: 2026-08-17 auth/backend recovery v2
  * Target spreadsheet:
  *   1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw
  *
