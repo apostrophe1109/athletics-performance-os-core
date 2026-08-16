@@ -112,15 +112,28 @@ def main():
         raise RuntimeError("Temporary backend probe marker was not found; refusing diagnostic deployment")
     probe_source = original_source.replace(probe_marker, probe_replacement, 1)
 
-    def deploy_source(source_text, description):
+    def deploy_source(source_text, description, enable_advanced_sheets=False):
         local_files = json.loads(json.dumps(files))
         local_target = None
+        local_manifest = None
         for item in local_files:
             if item.get("name") == code_file_name and item.get("type") == "SERVER_JS":
                 local_target = item
-                break
+            if item.get("name") == "appsscript" and item.get("type") == "JSON":
+                local_manifest = item
         if local_target is None:
             raise RuntimeError("Diagnostic deploy target SERVER_JS was not found")
+        if local_manifest is None:
+            raise RuntimeError("Diagnostic deploy appsscript manifest was not found")
+        if enable_advanced_sheets:
+            manifest_obj = json.loads(local_manifest.get("source") or "{}")
+            dependencies = manifest_obj.get("dependencies") or {}
+            services = dependencies.get("enabledAdvancedServices") or []
+            services = [service for service in services if service.get("userSymbol") != "Sheets"]
+            services.append({"userSymbol": "Sheets", "version": "v4", "serviceId": "sheets"})
+            dependencies["enabledAdvancedServices"] = services
+            manifest_obj["dependencies"] = dependencies
+            local_manifest["source"] = json.dumps(manifest_obj, ensure_ascii=False, separators=(",", ":"))
         local_target["source"] = source_text
         http_json(
             f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
@@ -173,9 +186,9 @@ def main():
     probe_results = {}
     restore_error = None
     try:
-        deploy_source(probe_source, "APOS temporary backend open-mode probe")
+        deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "advanced", "rest", "openfile", "openurl"]:
+        for probe_mode in ["drive", "advanced", "openfile", "openurl"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
