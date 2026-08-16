@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_130caa6ccdbf484f95a09cf033f4e26f",
-  "generatedAt": "2026-08-16T21:35:18.363Z",
-  "baseCommitSha": "1e257e57bb43fdba5daa5b002aa1102f3653a45d",
-  "changeReason": "承認済みのAPOS View高速化を反映する。初期表示を当日sessions優先、周辺データ遅延ロード、週/月オンデマンド取得、表示キャッシュ、更新ボタン部分更新へ変更する。",
+  "deploymentId": "SITEDEPLOY_0aaca3e95a0344dd97bd39af1a2ba126",
+  "generatedAt": "2026-08-16T22:02:15.441Z",
+  "baseCommitSha": "cf7b2cf18e8e71ad1f20821ab863165a8285ca0a",
+  "changeReason": "指定済みの複合走表記ルールをサイト全体へ反映し、類似Splitメニューを1行表記へ統一する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "bb006bb94ec705a1de53e86a7efee601454424d8416b5b2b5d1d973c7f7d455a"
+      "contentHash": "93bc62c913d3a8094dc95e9591dad5593be910120fbc0ce8e686ecd3ea6d66aa"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "48417396e0e13edc49e3e1048e505c42400ad3a8aea2a77f6cc656deafe4cdd6"
     }
   ]
 }

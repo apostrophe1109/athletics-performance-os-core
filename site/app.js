@@ -322,6 +322,68 @@ function renderDayMenuSections(context, sessions) {
   return panel;
 }
 
+function compactBridgeItems(raw) {
+  const parts = String(raw || "")
+    .split(/→|\n+/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  const output = [];
+
+  const runPart = value => {
+    const match = String(value || "").match(/^(\d{2,3})m\b/i);
+    if (!match) return null;
+    return {
+      distance: `${match[1]}m`,
+      closesSet: /[=＝]\s*1セット(?:目)?\s*$/.test(value)
+    };
+  };
+  const shortRest = value => /^\d+(?:〜\d+)?秒(?:休息)?$/.test(String(value || "").trim());
+
+  for (let i = 0; i < parts.length;) {
+    const first = runPart(parts[i]);
+    if (!first) {
+      output.push(parts[i]);
+      i += 1;
+      continue;
+    }
+
+    const distances = [first.distance];
+    let j = i + 1;
+    let closed = first.closesSet;
+    while (!closed && j + 1 < parts.length && shortRest(parts[j])) {
+      const nextRun = runPart(parts[j + 1]);
+      if (!nextRun) break;
+      distances.push(nextRun.distance);
+      closed = nextRun.closesSet;
+      j += 2;
+    }
+
+    if (!closed || distances.length < 2) {
+      output.push(parts[i]);
+      i += 1;
+      continue;
+    }
+
+    let setCount = 1;
+    let betweenSetRest = "";
+    const restMatch = String(parts[j] || "").match(/^(\d+(?:〜\d+)?)分休息$/);
+    if (restMatch) {
+      betweenSetRest = restMatch[1];
+      j += 1;
+    }
+    const repeatMatch = String(parts[j] || "").match(/^同内容(\d+)セット目$/);
+    if (repeatMatch) {
+      setCount = Number(repeatMatch[1]);
+      j += 1;
+    }
+
+    output.push(`(${distances.join("+")})×${setCount}set${betweenSetRest ? ` rest${betweenSetRest}min` : ""}`);
+    i = j;
+  }
+
+  return output;
+}
+
 function dayMenuEntries(context, sessions) {
   const menu = context.menuItems || [];
   if (menu.length) {
@@ -333,10 +395,7 @@ function dayMenuEntries(context, sessions) {
     });
   }
 
-  const bridgeEntries = sessions.flatMap(session => String(session.bridge || "")
-    .split(/→|\n+/)
-    .map(value => value.trim())
-    .filter(Boolean)
+  const bridgeEntries = sessions.flatMap(session => compactBridgeItems(session.bridge)
     .map(value => ({
       title: value,
       detail: "",
@@ -724,7 +783,7 @@ function sessionOutline(session) {
   if (!session) return [];
   const raw = String(session.bridge || "").trim();
   if (!raw) return session.purpose ? [session.purpose] : [];
-  return raw.split(/→|\n+/).map(item => item.trim()).filter(Boolean).slice(0, 7);
+  return compactBridgeItems(raw).slice(0, 7);
 }
 
 function sessionHighlights(session, maxItems = 3) {
