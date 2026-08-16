@@ -97,6 +97,15 @@ def main():
           dateTimeRenderOption: 'FORMATTED_STRING'
         });
         if (!sample || !sample.values || !sample.values.length) throw new Error('VALUES_EMPTY');
+      } else if (mode === 'advancedgrid') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var grid = Sheets.Spreadsheets.get(APOS_CONFIG.SPREADSHEET_ID, {
+          ranges: ["'08_セッション'!A1:B3"],
+          includeGridData: true,
+          fields: 'sheets(data(rowData(values(effectiveValue,formattedValue))))'
+        });
+        var rows = grid && grid.sheets && grid.sheets[0] && grid.sheets[0].data && grid.sheets[0].data[0] && grid.sheets[0].data[0].rowData;
+        if (!rows || !rows.length) throw new Error('GRID_DATA_EMPTY');
       } else if (mode === 'rest') {
         var token = ScriptApp.getOAuthToken();
         var response = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '?fields=spreadsheetId', {
@@ -151,11 +160,6 @@ def main():
             services.append({"userSymbol": "Sheets", "version": "v4", "serviceId": "sheets"})
             dependencies["enabledAdvancedServices"] = services
             manifest_obj["dependencies"] = dependencies
-            scopes = list(manifest_obj.get("oauthScopes") or [])
-            external_scope = "https://www.googleapis.com/auth/script.external_request"
-            if external_scope not in scopes:
-                scopes.append(external_scope)
-            manifest_obj["oauthScopes"] = scopes
             local_manifest["source"] = json.dumps(manifest_obj, ensure_ascii=False, separators=(",", ":"))
         local_target["source"] = source_text
         http_json(
@@ -211,7 +215,7 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "rest", "restvalues"]:
+        for probe_mode in ["drive", "advanced", "advancedgrid"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
