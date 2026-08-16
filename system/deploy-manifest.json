@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_4939bb30340c4d8e87cd7f1e6b62482b",
-  "generatedAt": "2026-08-16T19:49:35.463Z",
-  "baseCommitSha": "7855547404fa5e50a8a297226d791be6b280055d",
-  "changeReason": "認証障害修正を完遂するため、Advanced Sheets Values.getによる実データREAD可否を一時診断し元ソースとmanifestへ復元する。",
+  "deploymentId": "SITEDEPLOY_6743642080004e5193cc5cf0e9650de2",
+  "generatedAt": "2026-08-16T19:53:10.272Z",
+  "baseCommitSha": "aa275dd2a81a05c3b3a1aa787167d7d9d8167619",
+  "changeReason": "認証障害修正を完遂するため、script.external_requestを一時追加してSheets REST metadata/Values経路を診断し元ソースとmanifestへ復元する。",
   "files": [
     {
       "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "47a4b1d108b29c6c2dc0224a75ddf273dfea74a0d4f48c856d65eb1b4665eabf"
+      "contentHash": "851ac95c330c9f079706450baa6e7654217f77c7dcd54b419dd6018b9c3be8c0"
     }
   ]
 }

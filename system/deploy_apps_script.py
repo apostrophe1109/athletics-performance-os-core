@@ -107,6 +107,17 @@ def main():
         if (response.getResponseCode() !== 200) throw new Error('SHEETS_REST_HTTP_' + response.getResponseCode());
         var restMeta = JSON.parse(response.getContentText() || '{}');
         if (restMeta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+      } else if (mode === 'restvalues') {
+        var token2 = ScriptApp.getOAuthToken();
+        var rangeText = encodeURIComponent("'08_セッション'!A1:B3");
+        var response2 = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '/values/' + rangeText + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING', {
+          method: 'get',
+          headers: { Authorization: 'Bearer ' + token2 },
+          muteHttpExceptions: true
+        });
+        if (response2.getResponseCode() !== 200) throw new Error('SHEETS_REST_VALUES_HTTP_' + response2.getResponseCode());
+        var restValues = JSON.parse(response2.getContentText() || '{}');
+        if (!restValues.values || !restValues.values.length) throw new Error('VALUES_EMPTY');
       } else {
         return APOS_json_({ success: false, status: 'PROBE_MODE_INVALID', mode: mode });
       }
@@ -140,6 +151,11 @@ def main():
             services.append({"userSymbol": "Sheets", "version": "v4", "serviceId": "sheets"})
             dependencies["enabledAdvancedServices"] = services
             manifest_obj["dependencies"] = dependencies
+            scopes = list(manifest_obj.get("oauthScopes") or [])
+            external_scope = "https://www.googleapis.com/auth/script.external_request"
+            if external_scope not in scopes:
+                scopes.append(external_scope)
+            manifest_obj["oauthScopes"] = scopes
             local_manifest["source"] = json.dumps(manifest_obj, ensure_ascii=False, separators=(",", ":"))
         local_target["source"] = source_text
         http_json(
@@ -195,7 +211,7 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "advanced", "advancedvalues"]:
+        for probe_mode in ["drive", "rest", "restvalues"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
