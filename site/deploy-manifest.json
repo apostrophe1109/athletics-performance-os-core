@@ -1,24 +1,29 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_fd461898962e405eb35c9ec58b9b006e",
-  "generatedAt": "2026-08-16T04:33:54.566Z",
-  "baseCommitSha": "4776a3a5a280b4f32b3ec5c44e1352875e1a5bff",
-  "changeReason": "承認済みレイアウト調整を正式反映。iPhone Airで日・週・月を見やすくし、月は7列カレンダーのまま少し縦長化、週は簡潔な箇条書き、日/週/月に前後移動ボタンを追加する。",
+  "deploymentId": "SITEDEPLOY_029c10ab37e5494b8529f973ce02c6fc",
+  "generatedAt": "2026-08-16T04:55:08.307Z",
+  "baseCommitSha": "cc584b20886b1f6b601649f5de5323cc24391d44",
+  "changeReason": "承認済みAPOS v2.2.0日別メニュー強化を反映し、今日の練習コンセプトとウォーミングアップから補強・クールダウンまでを数値込みで一覧表示する。",
   "files": [
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "9e94753aac544a5c8f9a992b4c0e4e7c5139bd38286bddaf6269b1ebc34217fb"
+    },
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "b104bd3a26253e5846c10dd8dece52874cf79560479c6a2d4f2379d630b4be7b"
+      "contentHash": "9e7a2e45ebdcd946da8229ca04d354bc075df98a22560bc960038d2efcd6ceba"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "5a4c86806a4091955c543b417966e2c1f7eeec5751691b7ed015243377e2e178"
+      "contentHash": "cb5f9c92fc22441c9a01c317f978ad5c762b803270472eda1bc21887d81c22d2"
     },
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "6c2c7d2da4086e1eda1789746a767b8a50e0207bad29871ef0b3058d12793277"
+      "contentHash": "ae2e321ebc9f56ab7d3bec07e48fbd0aff5b0d9d65794b8f5d1bae28ffc47dfc"
     }
   ]
 }

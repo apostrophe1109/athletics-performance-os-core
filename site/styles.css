@@ -128,6 +128,27 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .concept-card__label { display: block; color: var(--accent-2); font-size: .68rem; font-weight: 850; letter-spacing: .08em; }
 .concept-card strong { display: block; margin-top: 5px; line-height: 1.5; }
+.concept-card--primary { padding: 18px; border-color: color-mix(in srgb, var(--accent-2) 42%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-2) 10%, var(--surface-2)), var(--surface-2)); }
+.concept-card--primary strong { font-size: 1.03rem; line-height: 1.65; }
+.concept-card__cue { margin: 9px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.55; }
+.day-head--compact { align-items: center; }
+.day-head--compact .day-title { font-size: clamp(1.35rem, 4.2vw, 2.35rem); }
+
+.day-menu { display: grid; gap: 10px; }
+.day-menu__heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; padding: 2px 2px 4px; }
+.day-menu__heading h3 { margin: 0; font-size: 1.1rem; }
+.day-menu-section { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); }
+.day-menu-section__head { display: grid; grid-template-columns: 9px minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 11px 13px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.025); }
+.day-menu-section__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent-2); }
+.day-menu-section__head strong { font-size: .82rem; }
+.day-menu-section__count { color: var(--muted); font-size: .64rem; font-weight: 800; }
+.day-menu-section__list { list-style: none; margin: 0; padding: 0; }
+.day-menu-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; min-height: 54px; padding: 10px 13px 10px 30px; position: relative; }
+.day-menu-row + .day-menu-row { border-top: 1px solid var(--line); }
+.day-menu-row::before { content: "•"; position: absolute; left: 14px; top: 12px; color: var(--accent); font-weight: 900; }
+.day-menu-row__copy strong { display: block; font-size: .8rem; line-height: 1.45; }
+.day-menu-row__copy span { display: block; margin-top: 3px; color: var(--muted); font-size: .68rem; line-height: 1.45; }
+.day-menu-row__dose { color: var(--accent); font-size: .7rem; font-weight: 900; text-align: right; white-space: nowrap; }
 
 .menu-list { display: grid; gap: 8px; }
 .menu-item {
@@ -303,6 +324,16 @@ button { -webkit-tap-highlight-color: transparent; }
   .period-nav__button, .period-nav__today { min-height: 46px; font-size: .69rem; }
   .day-head { grid-template-columns: minmax(0,1fr) 122px; gap: 10px; }
   .day-title { font-size: 1.75rem; }
+  .concept-card--primary { padding: 15px; }
+  .concept-card--primary strong { font-size: .92rem; }
+  .concept-card__cue { font-size: .7rem; }
+  .day-menu { gap: 9px; }
+  .day-menu-section__head { padding: 10px 11px; }
+  .day-menu-row { min-height: 52px; padding: 9px 10px 9px 27px; gap: 8px; }
+  .day-menu-row::before { left: 12px; top: 11px; }
+  .day-menu-row__copy strong { font-size: .76rem; }
+  .day-menu-row__copy span { font-size: .64rem; }
+  .day-menu-row__dose { font-size: .64rem; }
   .day-purpose { font-size: .8rem; }
   .intensity-card { padding: 10px; }
   .intensity-card strong { font-size: 1.08rem; }

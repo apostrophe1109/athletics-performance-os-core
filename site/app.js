@@ -184,46 +184,30 @@ function renderDayView() {
   wrap.append(renderPeriodNavigator("day"));
   const context = state.dayContext || state.context || {};
   const sessions = context.sessions || [];
-  const menu = context.menuItems || [];
   const primary = sessions[0] || null;
   const intensity = sessionIntensity(primary);
 
-  const head = element("div", "day-head");
+  if (primary) {
+    const concept = element("section", "concept-card concept-card--primary");
+    concept.append(
+      element("span", "concept-card__label", "今日の練習コンセプト"),
+      element("strong", "", primary.purpose || primary.mainAdaptation || primary.role || "計画どおりに実施")
+    );
+    if (primary.cue) concept.append(element("p", "concept-card__cue", primary.cue));
+    wrap.append(concept);
+  }
+
+  const head = element("div", "day-head day-head--compact");
   const copy = element("div");
   copy.append(
     element("span", "eyebrow eyebrow--cyan", `DAY / ${formatJapaneseDate(state.selectedDate)}`),
     element("h2", "day-title", primary?.title || primary?.role || "登録済みセッションなし")
   );
-  if (primary?.purpose) copy.append(element("p", "day-purpose", primary.purpose));
-
   const strength = intensityCard(intensity);
   head.append(copy, strength);
   wrap.append(head);
 
-  if (primary) {
-    const concept = element("div", "concept-card");
-    concept.append(
-      element("span", "concept-card__label", "今日のコンセプト"),
-      element("strong", "", primary.purpose || primary.intent || primary.role || "計画どおりに実施")
-    );
-    wrap.append(concept);
-  }
-
-  const menuList = element("div", "menu-list");
-  if (!sessions.length) {
-    menuList.append(empty("この日の登録済みセッションはありません。"));
-  } else if (!menu.length) {
-    sessions.forEach((session, index) => {
-      menuList.append(menuItem(index + 1, session.title || session.role || "セッション", session.purpose || "", intensityText(sessionIntensity(session))));
-    });
-  } else {
-    menu.forEach((item, index) => {
-      const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
-      const subtitle = item.cue || item.purpose || "";
-      menuList.append(menuItem(index + 1, title, subtitle, doseText(item)));
-    });
-  }
-  wrap.append(menuList);
+  wrap.append(renderDayMenuSections(context, sessions));
 
   const stop = sessions.map(item => item.stopCondition).filter(Boolean).join(" / ");
   if (stop) {
@@ -234,6 +218,109 @@ function renderDayView() {
 
   wrap.append(renderRecordEntry());
   return wrap;
+}
+
+function renderDayMenuSections(context, sessions) {
+  const panel = element("section", "day-menu");
+  const heading = element("div", "day-menu__heading");
+  heading.append(
+    element("span", "eyebrow", "TODAY'S MENU"),
+    element("h3", "", "今日やること")
+  );
+  panel.append(heading);
+
+  const entries = dayMenuEntries(context, sessions);
+  if (!entries.length) {
+    panel.append(empty("この日の詳細メニューは正本に登録されていません。"));
+    return panel;
+  }
+
+  const sections = [
+    ["warmup", "ウォーミングアップ"],
+    ["primer", "ドリル／神経プライマー"],
+    ["sprint", "スプリント／助走速度"],
+    ["main", "メイン"],
+    ["supplemental", "補強"],
+    ["cooldown", "クールダウン"],
+    ["other", "その他"]
+  ];
+
+  sections.forEach(([key, label]) => {
+    const items = entries.filter(item => item.section === key);
+    if (!items.length) return;
+    const block = element("section", "day-menu-section");
+    const blockHead = element("div", "day-menu-section__head");
+    blockHead.append(
+      element("span", "day-menu-section__dot", ""),
+      element("strong", "", label),
+      element("span", "day-menu-section__count", `${items.length}項目`)
+    );
+    const list = element("ul", "day-menu-section__list");
+    items.forEach(item => {
+      const row = element("li", "day-menu-row");
+      const copy = element("div", "day-menu-row__copy");
+      copy.append(element("strong", "", item.title));
+      if (item.detail) copy.append(element("span", "", item.detail));
+      row.append(copy);
+      if (item.dose) row.append(element("span", "day-menu-row__dose", item.dose));
+      list.append(row);
+    });
+    block.append(blockHead, list);
+    panel.append(block);
+  });
+  return panel;
+}
+
+function dayMenuEntries(context, sessions) {
+  const menu = context.menuItems || [];
+  if (menu.length) {
+    return menu.map((item, index) => {
+      const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
+      const detail = item.cue || item.purpose || "";
+      const searchable = [title, detail, item.category, item.block, item.section].filter(Boolean).join(" ");
+      return { title, detail, dose: doseText(item), section: inferDayMenuSection(searchable) };
+    });
+  }
+
+  const bridgeEntries = sessions.flatMap(session => String(session.bridge || "")
+    .split(/→|\n+/)
+    .map(value => value.trim())
+    .filter(Boolean)
+    .map(value => ({
+      title: value,
+      detail: "",
+      dose: "",
+      section: inferDayMenuSection(value)
+    })));
+  if (bridgeEntries.length) return bridgeEntries;
+
+  return sessions.map(session => ({
+    title: session.title || session.role || "セッション",
+    detail: session.purpose || "",
+    dose: sessionDoseText(session),
+    section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" "))
+  }));
+}
+
+function inferDayMenuSection(value) {
+  const text = String(value || "").toLowerCase();
+  if (/クール|整理運動|静的ストレッチ/.test(text)) return "cooldown";
+  if (/ウォーム|ストレッチ|可動域|モビリティ|腹圧/.test(text)) return "warmup";
+  if (/リバースブリッジ|スキップ|ポゴ|ドリル|ロープフロー|プライオ|神経プライマー/.test(text)) return "primer";
+  if (/ダッシュ|全力走|max-v|スプリント|流し|テンポ/.test(text)) return "sprint";
+  if (/跳躍|助走|踏切|トリプル|バウンディング|ホップ|ステップ|ジャンプ/.test(text)) return "main";
+  if (/メディシン|mb|プランク|ヒップリフト|スクワット|補強|体幹|投げ/.test(text)) return "supplemental";
+  return "other";
+}
+
+function sessionDoseText(session) {
+  return [
+    session.plannedDistanceM && `${session.plannedDistanceM}m`,
+    session.plannedReps && `${session.plannedReps}回`,
+    session.plannedSets && `${session.plannedSets}セット`,
+    session.plannedWeightKg && `${session.plannedWeightKg}kg`,
+    session.plannedRestSec && `休息${session.plannedRestSec}秒`
+  ].filter(Boolean).join(" / ");
 }
 
 function renderRecordEntry() {
