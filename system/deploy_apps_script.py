@@ -66,25 +66,135 @@ def main():
     if manifest_key not in original_file_keys:
         raise RuntimeError("Required appsscript/JSON manifest was not found; refusing to update project")
 
-    configured_sheet_id = ""
-    marker = "SPREADSHEET_ID: '"
-    marker_pos = source.find(marker)
-    if marker_pos >= 0:
-        start = marker_pos + len(marker)
-        end = source.find("'", start)
-        if end > start:
-            configured_sheet_id = source[start:end]
-    project_diag = http_json(
-        f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}",
-        token=token,
-    )
-    parent_id = str(project_diag.get("parentId") or "").strip()
-    safe_diag = {
-        "hasParentId": bool(parent_id),
-        "configuredSpreadsheetIdFound": bool(configured_sheet_id),
-        "parentMatchesConfiguredSpreadsheet": bool(parent_id and configured_sheet_id and parent_id == configured_sheet_id),
+    original_source = source
+    probe_marker = "function doGet(e) {\n  var action = e && e.parameter && e.parameter.action ? String(e.parameter.action) : 'health';"
+    probe_replacement = """function doGet(e) {
+  var action = e && e.parameter && e.parameter.action ? String(e.parameter.action) : 'health';
+  if (action === '__backendProbe') {
+    var mode = e && e.parameter && e.parameter.mode ? String(e.parameter.mode) : '';
+    var started = Date.now();
+    try {
+      if (mode === 'drive') {
+        var file = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        file.getName();
+      } else if (mode === 'openfile') {
+        var file2 = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        var ss2 = SpreadsheetApp.open(file2);
+        if (ss2.getId() !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+        ss2.getSheets().length;
+      } else if (mode === 'openurl') {
+        var ss3 = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/' + APOS_CONFIG.SPREADSHEET_ID + '/edit');
+        if (ss3.getId() !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+        ss3.getSheets().length;
+      } else {
+        return APOS_json_({ success: false, status: 'PROBE_MODE_INVALID', mode: mode });
+      }
+      return APOS_json_({ success: true, status: 'PROBE_OK', mode: mode, elapsedMs: Date.now() - started });
+    } catch (error) {
+      return APOS_json_({ success: false, status: 'PROBE_ERROR', mode: mode, errorType: String(error && error.name || 'Error'), elapsedMs: Date.now() - started });
     }
-    raise RuntimeError("APOS_PARENT_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
+  }"""
+    if probe_marker not in original_source:
+        raise RuntimeError("Temporary backend probe marker was not found; refusing diagnostic deployment")
+    probe_source = original_source.replace(probe_marker, probe_replacement, 1)
+
+    def deploy_source(source_text, description):
+        local_files = json.loads(json.dumps(files))
+        local_target = None
+        for item in local_files:
+            if item.get("name") == code_file_name and item.get("type") == "SERVER_JS":
+                local_target = item
+                break
+        if local_target is None:
+            raise RuntimeError("Diagnostic deploy target SERVER_JS was not found")
+        local_target["source"] = source_text
+        http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
+            method="PUT",
+            body={"files": local_files},
+            token=token,
+        )
+        new_version = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/versions",
+            method="POST",
+            body={"description": description},
+            token=token,
+        )
+        new_version_number = new_version.get("versionNumber")
+        if not isinstance(new_version_number, int):
+            raise RuntimeError("Diagnostic version create did not return versionNumber")
+        current = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
+            token=token,
+        )
+        cfg_diag = current.get("deploymentConfig") or {}
+        manifest_name_diag = cfg_diag.get("manifestFileName")
+        if not manifest_name_diag:
+            raise RuntimeError("Diagnostic deployment manifestFileName missing")
+        http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
+            method="PUT",
+            body={"deploymentConfig": {
+                "scriptId": script_id,
+                "versionNumber": new_version_number,
+                "manifestFileName": manifest_name_diag,
+                "description": description,
+            }},
+            token=token,
+        )
+        for _ in range(10):
+            rb = http_json(
+                f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
+                token=token,
+            )
+            observed = (rb.get("deploymentConfig") or {}).get("versionNumber")
+            try:
+                if int(observed) == int(new_version_number):
+                    return new_version_number
+            except (TypeError, ValueError):
+                pass
+            time.sleep(2)
+        raise RuntimeError("Diagnostic deployment version read-back did not converge")
+
+    probe_results = {}
+    restore_error = None
+    try:
+        deploy_source(probe_source, "APOS temporary backend open-mode probe")
+        time.sleep(2)
+        for probe_mode in ["drive", "openfile", "openurl"]:
+            probe_url = (
+                f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
+                f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
+            )
+            started = time.time()
+            try:
+                with urllib.request.urlopen(probe_url, timeout=12) as response:
+                    raw = response.read().decode("utf-8")
+                    payload = json.loads(raw) if raw else {}
+                    probe_results[probe_mode] = {
+                        "httpStatus": response.status,
+                        "success": payload.get("success"),
+                        "status": payload.get("status"),
+                        "errorType": payload.get("errorType"),
+                        "elapsedSeconds": round(time.time() - started, 2),
+                    }
+            except Exception as exc:
+                probe_results[probe_mode] = {
+                    "success": False,
+                    "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
+                    "errorType": type(exc).__name__,
+                    "elapsedSeconds": round(time.time() - started, 2),
+                }
+    finally:
+        try:
+            deploy_source(original_source, "APOS restore after temporary backend probe")
+        except Exception as exc:
+            restore_error = str(exc)
+
+    safe_diag = {"probeResults": probe_results, "restoredOriginalSource": restore_error is None}
+    if restore_error:
+        safe_diag["restoreError"] = restore_error
+    raise RuntimeError("APOS_OPEN_MODE_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
 
     target = None
     for f in files:
