@@ -90,6 +90,13 @@ def main():
         if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
         var meta = Sheets.Spreadsheets.get(APOS_CONFIG.SPREADSHEET_ID, { fields: 'spreadsheetId' });
         if (!meta || meta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+      } else if (mode === 'advancedvalues') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var sample = Sheets.Spreadsheets.Values.get(APOS_CONFIG.SPREADSHEET_ID, "'08_セッション'!A1:B3", {
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'FORMATTED_STRING'
+        });
+        if (!sample || !sample.values || !sample.values.length) throw new Error('VALUES_EMPTY');
       } else if (mode === 'rest') {
         var token = ScriptApp.getOAuthToken();
         var response = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '?fields=spreadsheetId', {
@@ -188,7 +195,7 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "advanced"]:
+        for probe_mode in ["drive", "advanced", "advancedvalues"]:
             probe_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
                 f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
