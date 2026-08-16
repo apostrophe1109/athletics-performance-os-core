@@ -1,4 +1,5 @@
 name: APOS Worker Manual Deployment Gate
+run-name: APOS Worker ${{ inputs.mode }} @ ${{ github.sha }}
 
 on:
   workflow_dispatch:
@@ -11,6 +12,11 @@ on:
         options:
           - validate
           - deploy
+      expected_commit_sha:
+        description: "Maintenance自動dispatch時の期待commit SHA。手動bootstrapでは空欄可。"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -25,14 +31,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout exact workflow commit
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: "24"
           package-manager-cache: false
+
+      - name: Verify expected commit SHA
+        shell: bash
+        env:
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_commit_sha }}
+          ACTUAL_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "$EXPECTED_COMMIT_SHA" ]; then
+            [[ "$EXPECTED_COMMIT_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "expected_commit_sha invalid"; exit 1; }
+            [ "${EXPECTED_COMMIT_SHA,,}" = "${ACTUAL_COMMIT_SHA,,}" ] || {
+              echo "Expected commit does not match workflow commit. Deployment blocked."
+              exit 1
+            }
+          fi
+          echo "Commit guard: OK"
 
       - name: Validate required configuration
         shell: bash
@@ -69,18 +94,22 @@ jobs:
             --name "$APOS_WORKER_NAME" \
             --compatibility-date 2026-08-14 \
             --keep-vars \
+            --var APOS_DEPLOY_COMMIT:${{ github.sha }} \
             --dry-run \
             --outdir /tmp/apos-worker-dry-run
 
   deploy:
     name: Deploy Worker (write)
     needs: preflight
-    if: ${{ github.event.inputs.mode == 'deploy' }}
+    if: ${{ inputs.mode == 'deploy' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout exact workflow commit
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
 
       - name: Deploy Cloudflare Worker
         uses: cloudflare/wrangler-action@v4
@@ -92,8 +121,28 @@ jobs:
             --name ${{ vars.APOS_WORKER_NAME }}
             --compatibility-date 2026-08-14
             --keep-vars
+            --var APOS_DEPLOY_COMMIT:${{ github.sha }}
+
+      - name: Confirm Cloudflare deployment registry (read-only)
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APOS_WORKER_NAME: ${{ vars.APOS_WORKER_NAME }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deployments status \
+            --name "$APOS_WORKER_NAME" \
+            --json > /tmp/apos-worker-deployment.json
+          python - <<'PY'
+          import json
+          with open('/tmp/apos-worker-deployment.json', 'r', encoding='utf-8') as f:
+              json.load(f)
+          print('Cloudflare deployment registry: readable')
+          PY
 
       - name: Deployment completed
         run: |
           echo "Worker deployment command completed."
-          echo "Run APOS health READ-back before accepting this deployment."
+          echo "deployed_commit=${{ github.sha }}"
+          echo "APOS health + View READ-back are still required before VERIFIED."
