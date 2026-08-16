@@ -56,43 +56,6 @@ def main():
     expected_source_sha256 = sha256_text(source)
     token = oauth_access_token()
 
-    configured_sheet_id = ""
-    marker = "SPREADSHEET_ID: '"
-    marker_pos = source.find(marker)
-    if marker_pos >= 0:
-        start = marker_pos + len(marker)
-        end = source.find("'", start)
-        if end > start:
-            configured_sheet_id = source[start:end]
-    if not configured_sheet_id:
-        raise RuntimeError("APOS_CI_SHEETS_DIAG configured spreadsheet id not found")
-
-    ci_diag = {}
-    tests = {
-        "metadata": f"https://sheets.googleapis.com/v4/spreadsheets/{urllib.parse.quote(configured_sheet_id)}?fields=spreadsheetId",
-        "values": f"https://sheets.googleapis.com/v4/spreadsheets/{urllib.parse.quote(configured_sheet_id)}/values/{urllib.parse.quote(chr(39) + '08_セッション' + chr(39) + '!A1:B3', safe='')}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING",
-    }
-    for test_name, test_url in tests.items():
-        req = urllib.request.Request(test_url, headers={"Accept":"application/json", "Authorization":f"Bearer {token}"}, method="GET")
-        started = time.time()
-        try:
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                raw = resp.read().decode("utf-8")
-                payload = json.loads(raw) if raw else {}
-                ci_diag[test_name] = {
-                    "success": True,
-                    "httpStatus": resp.status,
-                    "elapsedSeconds": round(time.time() - started, 2),
-                    "hasValues": bool(payload.get("values")) if test_name == "values" else None,
-                }
-        except Exception as exc:
-            ci_diag[test_name] = {
-                "success": False,
-                "errorType": type(exc).__name__,
-                "elapsedSeconds": round(time.time() - started, 2),
-            }
-    raise RuntimeError("APOS_CI_SHEETS_DIAG " + json.dumps(ci_diag, ensure_ascii=False, sort_keys=True))
-
     content = http_json(f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content", token=token)
     files = content.get("files")
     if not isinstance(files, list) or not files:
@@ -114,6 +77,17 @@ def main():
       if (mode === 'drive') {
         var file = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
         file.getName();
+      } else if (mode === 'makecopy') {
+        var originalFile = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        var copyFile = originalFile.makeCopy('APOS Backend Recovery Candidate ' + new Date().toISOString());
+        return APOS_json_({ success: true, status: 'COPY_CREATED', copyId: copyFile.getId() });
+      } else if (mode === 'opencopy') {
+        var copyId = e && e.parameter && e.parameter.copyId ? String(e.parameter.copyId) : '';
+        if (!copyId) throw new Error('COPY_ID_REQUIRED');
+        var copySs = SpreadsheetApp.openById(copyId);
+        var copySheetCount = copySs.getSheets().length;
+        PropertiesService.getScriptProperties().setProperty('APOS_SPREADSHEET_ID_RECOVERY_CANDIDATE', copyId);
+        return APOS_json_({ success: true, status: 'COPY_OPEN_OK', sheetCount: copySheetCount });
       } else if (mode === 'openfile') {
         var file2 = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
         var ss2 = SpreadsheetApp.open(file2);
@@ -252,27 +226,51 @@ def main():
     try:
         deploy_source(probe_source, "APOS temporary backend open-mode probe", True)
         time.sleep(2)
-        for probe_mode in ["drive", "advanced", "advancedgrid"]:
-            probe_url = (
+        copy_id = None
+        make_url = (
+            f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
+            f"?action=__backendProbe&mode=makecopy"
+        )
+        started = time.time()
+        try:
+            with urllib.request.urlopen(make_url, timeout=20) as response:
+                raw = response.read().decode("utf-8")
+                payload = json.loads(raw) if raw else {}
+                copy_id = str(payload.get("copyId") or "").strip() or None
+                probe_results["makecopy"] = {
+                    "httpStatus": response.status,
+                    "success": bool(payload.get("success") and copy_id),
+                    "status": payload.get("status"),
+                    "elapsedSeconds": round(time.time() - started, 2),
+                    "copyIdStoredInternally": bool(copy_id),
+                }
+        except Exception as exc:
+            probe_results["makecopy"] = {
+                "success": False,
+                "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
+                "errorType": type(exc).__name__,
+                "elapsedSeconds": round(time.time() - started, 2),
+            }
+        if copy_id:
+            open_url = (
                 f"https://script.google.com/macros/s/{urllib.parse.quote(deployment_id)}/exec"
-                f"?action=__backendProbe&mode={urllib.parse.quote(probe_mode)}"
+                f"?action=__backendProbe&mode=opencopy&copyId={urllib.parse.quote(copy_id)}"
             )
             started = time.time()
             try:
-                with urllib.request.urlopen(probe_url, timeout=12) as response:
+                with urllib.request.urlopen(open_url, timeout=20) as response:
                     raw = response.read().decode("utf-8")
                     payload = json.loads(raw) if raw else {}
-                    probe_results[probe_mode] = {
+                    probe_results["opencopy"] = {
                         "httpStatus": response.status,
                         "success": payload.get("success"),
                         "status": payload.get("status"),
-                        "code": payload.get("code"),
-                        "errorType": payload.get("errorType"),
-                        "errorMessage": str(payload.get("errorMessage") or payload.get("error") or "")[:240] or None,
+                        "sheetCount": payload.get("sheetCount"),
                         "elapsedSeconds": round(time.time() - started, 2),
+                        "recoveryCandidateStored": payload.get("status") == "COPY_OPEN_OK",
                     }
             except Exception as exc:
-                probe_results[probe_mode] = {
+                probe_results["opencopy"] = {
                     "success": False,
                     "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
                     "errorType": type(exc).__name__,
