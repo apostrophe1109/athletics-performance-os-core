@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.11
+ * Version: 1.4.12
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.11";
+const VERSION = "1.4.12";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1498,6 +1498,14 @@ async function getMaintenanceBackendDiagnostic(env) {
     body: "{}",
   });
 
+  const unknownRequestId = `diag_unknown_${crypto.randomUUID()}`;
+  const unknownEnvelope = await buildSignedEnvelope("diagnosticUnknownAction", {}, { id: "apostrophe", source: "MAINTENANCE" }, unknownRequestId, env);
+  const signedUnknownProbe = await maintenanceBackendProbe(normalizedUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json; charset=utf-8", accept: "application/json" },
+    body: JSON.stringify(unknownEnvelope),
+  });
+
   const requestId = `diag_${crypto.randomUUID()}`;
   const envelope = await buildSignedEnvelope("health", {}, { id: "apostrophe", source: "MAINTENANCE" }, requestId, env);
   const signedHealthProbe = await maintenanceBackendProbe(normalizedUrl, {
@@ -1516,6 +1524,7 @@ async function getMaintenanceBackendDiagnostic(env) {
     repoVariableError,
     getProbe,
     unsignedPostProbe,
+    signedUnknownProbe,
     signedHealthProbe,
     writePerformed: false,
   };
