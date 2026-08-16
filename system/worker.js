@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.6
+ * Version: 1.4.7
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.6";
+const VERSION = "1.4.7";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1432,7 +1432,7 @@ function maintenanceDeploymentSpecsForPaths(paths, env) {
     specs.push({ kind: "WORKER", workflowFile: WORKER_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Worker deploy @ " });
   }
   if (changed.has(`${root}/apps-script/Code.gs`)) {
-    specs.push({ kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Apps Script deploy @ " });
+    specs.push({ kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "" });
   }
   return specs;
 }
@@ -1447,10 +1447,10 @@ async function getDeploymentRunsForSpec(spec, commitSha, env) {
     { code: "MAINTENANCE_DEPLOYMENT_STATUS_FAILED" }
   );
   const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
-  const expectedTitle = `${spec.runTitlePrefix}${commitSha}`;
+  const expectedTitle = spec.runTitlePrefix ? `${spec.runTitlePrefix}${commitSha}` : "";
   return runs
     .filter(run => String(run?.head_sha || "").toLowerCase() === commitSha.toLowerCase())
-    .filter(run => String(run?.display_title || "") === expectedTitle)
+    .filter(run => !expectedTitle || String(run?.display_title || "") === expectedTitle)
     .sort((a, b) => Date.parse(String(b?.created_at || "")) - Date.parse(String(a?.created_at || "")));
 }
 
@@ -1500,7 +1500,7 @@ async function dispatchWorkerDeploymentOnce(commitSha, env) {
 }
 
 async function dispatchAppsScriptDeploymentOnce(commitSha, env) {
-  const spec = { kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Apps Script deploy @ " };
+  const spec = { kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "" };
   const existingRuns = await getDeploymentRunsForSpec(spec, commitSha, env);
   if (existingRuns.length) {
     const latest = existingRuns[0];
