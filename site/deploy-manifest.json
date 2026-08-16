@@ -1,14 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_6efa8447646a4bc39b852571d50bd91e",
-  "generatedAt": "2026-08-16T03:39:54.343Z",
-  "baseCommitSha": "c921a0f1ad34c22d7470ce3fb1319eb6424dc279",
-  "changeReason": "新レイアウトを維持したままAPOS Core既存layout契約との互換性を回復するためsectionsを追加し、公開Workflow検証を通してGitHub Pagesへ反映する。",
+  "deploymentId": "SITEDEPLOY_d45d71612c7f493cb31ff57e6f6d8443",
+  "generatedAt": "2026-08-16T03:50:47.399Z",
+  "baseCommitSha": "3741523906559dabff2a92a206eebcfa10face59",
+  "changeReason": "公開端末で旧UIが残る問題を解消するため、cache抑止・BFCache対策・asset cache-bust・APOS v2.0.1表示・Action引数修正・強度判定修正を反映する。",
   "files": [
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "5bb28be7672294764414c42960f490094e7d5bbe1d88a0197e7040075ab36e50"
+    },
+    {
+      "path": "site/app.js",
+      "operation": "UPSERT",
+      "contentHash": "a6ab08d1ed01b7cee4e12abe044cdcc15989b116e9f79e1722247f91ace3f6fa"
+    },
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "5f9d6988bbd25eae0be3240edf72c69ff9eaa65af3015d3d0e84c5ecd0edf697"
+      "contentHash": "a77607d683feb9f9661258d1adf4172d1341a98da95b5a985c53109b7f2be716"
     }
   ]
 }

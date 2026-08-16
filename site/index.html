@@ -6,8 +6,11 @@
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#071017">
     <meta name="description" content="Athletics Performance OS：日・週・月の練習計画と実施記録">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Athletics Performance OS</title>
-    <link rel="stylesheet" href="./styles.css?v=20260816c">
+    <link rel="stylesheet" href="./styles.css?v=20260816f">
   </head>
   <body>
     <a class="skip-link" href="#dashboard">本文へ移動</a>
@@ -15,6 +18,7 @@
       <div>
         <p class="eyebrow">APOSTROPHE / ATHLETICS PERFORMANCE OS</p>
         <h1 id="site-title">Athletics Performance OS</h1>
+        <p class="eyebrow" aria-label="build version">APOS v2.0.1</p>
       </div>
       <div class="connection" aria-live="polite">
         <span id="connection-dot" class="connection__dot"></span>
@@ -33,7 +37,12 @@
     </template>
 
     <noscript>このサイトを表示するにはJavaScriptを有効にしてください。</noscript>
-    <script src="./config.js?v=20260815b"></script>
-    <script type="module" src="./app.js?v=20260816c"></script>
+    <script>
+      window.addEventListener("pageshow", event => {
+        if (event.persisted) window.location.reload();
+      });
+    </script>
+    <script src="./config.js?v=20260816f"></script>
+    <script type="module" src="./app.js?v=20260816f"></script>
   </body>
 </html>

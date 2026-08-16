@@ -60,7 +60,7 @@ async function loadDashboardData() {
   const rangeEnd = [month.end, addDays(weekStart, 6)].sort().at(-1);
 
   const [context, sessions, executions, measurements, exercises, profiles, events] = await Promise.all([
-    api("getTrainingContext", { date: state.today, sportProfileId: config.sportProfileId, historyDays: 14 }),
+    api("getTrainingContext", { date: state.today, historyDays: 14 }),
     records("sessions", { sessionDate: { $gte: rangeStart, $lte: rangeEnd }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500),
     records("executions", { sportProfileId: config.sportProfileId }, "executionDate", "DESC", 50),
     records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 50),
@@ -86,7 +86,7 @@ async function loadDayContext(date) {
   state.selectedDate = date;
   setConnection("idle", "日別データ取得中");
   try {
-    state.dayContext = await api("getTrainingContext", { date, sportProfileId: config.sportProfileId, historyDays: 14 });
+    state.dayContext = await api("getTrainingContext", { date, historyDays: 14 });
     state.viewMode = "day";
     renderDashboard();
     setConnection("ready", "最新データ");
@@ -526,9 +526,9 @@ function sessionIntensity(session) {
   if (raw.includes("MAX") || raw.includes("PERFORMANCE") || raw.includes("COMPETITION")) return 10;
   if (raw.includes("HIGH") && raw.includes("MEDIUM")) return 8;
   if (raw.includes("HIGH")) return 9;
+  if (raw.includes("LOW") && raw.includes("MEDIUM")) return 5;
   if (raw.includes("SHARP")) return 6;
   if (raw.includes("MEDIUM")) return 6;
-  if (raw.includes("LOW") && raw.includes("MEDIUM")) return 5;
   if (raw.includes("LOW")) return 3;
   if (raw.includes("REST") || raw.includes("RECOVERY")) return 1;
   return 5;
