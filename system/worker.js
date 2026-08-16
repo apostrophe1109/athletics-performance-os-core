@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.8
+ * Version: 1.4.9
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.8";
+const VERSION = "1.4.9";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1485,7 +1485,7 @@ function maintenanceDeploymentSpecsForPaths(paths, env) {
   if (changed.has(`${root}/worker.js`)) {
     specs.push({ kind: "WORKER", workflowFile: WORKER_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "APOS Worker deploy @ " });
   }
-  if (changed.has(`${root}/apps-script/Code.gs`)) {
+  if (changed.has(`${root}/apps-script/Code.gs`) || changed.has(`${root}/deploy_apps_script.py`)) {
     specs.push({ kind: "APPS_SCRIPT", workflowFile: APPS_SCRIPT_DEPLOY_WORKFLOW_FILE, runTitlePrefix: "" });
   }
   return specs;

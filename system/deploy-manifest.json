@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e8e335b57e6442eeb0e9a17aa4fc5447",
-  "generatedAt": "2026-08-16T19:17:03.613Z",
-  "baseCommitSha": "c195d4ce918acfd2c216a08993d298689435ec86",
-  "changeReason": "認証障害修正を完遂するため、Apps Script deploy失敗jobのエラー行を秘密値マスク付きでREADできる診断操作を追加する。",
+  "deploymentId": "SITEDEPLOY_72a88f656f2a4ff4ab992613cd7c28db",
+  "generatedAt": "2026-08-16T19:19:39.580Z",
+  "baseCommitSha": "af19f8bbd23f3947e3dfad83e0cd6d1034517c23",
+  "changeReason": "認証障害修正を完遂するため、deploy_apps_script.py変更をApps Script deployment対象として自動検知できるようにする。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "cb5cbdbe6ac053efb25b6145946683ddb27163b96a7a1be4a537323ecb860193"
+      "contentHash": "cb4e99e05910a3959b930ac497b491e9c8f878e8213b30336afeabb9deab3b6d"
     }
   ]
 }
