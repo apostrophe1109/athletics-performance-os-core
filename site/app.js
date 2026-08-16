@@ -156,18 +156,32 @@ function renderViewTabs() {
     button.type = "button";
     button.dataset.active = String(state.viewMode === mode);
     button.setAttribute("aria-pressed", String(state.viewMode === mode));
-    button.addEventListener("click", () => {
-      state.viewMode = mode;
-      if (mode === "day" && state.selectedDate !== state.today && !state.dayContext) state.selectedDate = state.today;
-      renderDashboard();
-    });
+    button.addEventListener("click", () => switchViewMode(mode).catch(showFatalError));
     nav.append(button);
   });
   return nav;
 }
 
+async function switchViewMode(mode) {
+  state.viewMode = mode;
+  const date = state.selectedDate || state.today;
+  if (mode === "day") {
+    await loadDayContext(date);
+    return;
+  }
+  if (mode === "week") {
+    const start = startOfWeek(date);
+    await ensureSessionsForRange(start, addDays(start, 6));
+  } else if (mode === "month") {
+    const range = monthRange(date);
+    await ensureSessionsForRange(range.start, range.end);
+  }
+  renderDashboard();
+}
+
 function renderDayView() {
   const wrap = element("div", "day-view");
+  wrap.append(renderPeriodNavigator("day"));
   const context = state.dayContext || state.context || {};
   const sessions = context.sessions || [];
   const menu = context.menuItems || [];
@@ -400,9 +414,10 @@ function draftList(title, items) {
 
 function renderWeekView() {
   const wrap = element("div", "week-view");
+  wrap.append(renderPeriodNavigator("week"));
   const start = startOfWeek(state.selectedDate || state.today);
   const dates = Array.from({ length: 7 }, (_, index) => addDays(start, index));
-  const header = sectionHeader("今週のトレーニング", `${formatJapaneseDate(dates[0])} – ${formatJapaneseDate(dates[6])}`);
+  const header = sectionHeader("週間トレーニング", `${formatJapaneseDate(dates[0])} – ${formatJapaneseDate(dates[6])}`);
   const scores = dates.map(date => daySessions(date).map(sessionIntensity).filter(value => value !== null)).flat();
   const average = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "—";
   header.append(pill(`週平均 ${average}/10`, true));
@@ -422,6 +437,12 @@ function renderWeekView() {
       intensityMini(score)
     );
     if (primary?.purpose) card.append(element("span", "week-day__sub", primary.purpose));
+    const outline = sessionOutline(primary);
+    if (outline.length) {
+      const details = element("ul", "week-day__details");
+      outline.forEach(item => details.append(element("li", "", item)));
+      card.append(details);
+    }
     card.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
     list.append(card);
   });
@@ -431,6 +452,7 @@ function renderWeekView() {
 
 function renderMonthView() {
   const wrap = element("div", "month-view");
+  wrap.append(renderPeriodNavigator("month"));
   const [year, month] = (state.selectedDate || state.today).split("-").map(Number);
   wrap.append(sectionHeader("月間トレーニング", `${year}年${month}月`));
 
@@ -445,18 +467,100 @@ function renderMonthView() {
   for (let day = 1; day <= count; day++) {
     const date = `${year}-${pad(month)}-${pad(day)}`;
     const sessions = daySessions(date);
-    const score = sessionIntensity(sessions[0] || null);
+    const primary = sessions[0] || null;
+    const score = sessionIntensity(primary);
     const cell = element("button", "month-day");
     cell.type = "button";
     cell.dataset.today = String(date === state.today);
     cell.append(element("span", "month-day__number", String(day)));
     if (score !== null) cell.append(intensityMini(score));
-    if (sessions[0]) cell.append(element("span", "month-day__role", sessions[0].role || shortLabel(sessions[0].title || "PLAN")));
+    if (primary) {
+      cell.append(
+        element("span", "month-day__role", primary.role || shortLabel(primary.title || "PLAN")),
+        element("span", "month-day__main", monthMainText(primary))
+      );
+    }
     cell.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
     grid.append(cell);
   }
   wrap.append(grid);
   return wrap;
+}
+
+function renderPeriodNavigator(mode) {
+  const labels = {
+    day: ["← 前日", "翌日 →"],
+    week: ["← 前週", "翌週 →"],
+    month: ["← 前月", "翌月 →"]
+  };
+  const nav = element("div", "period-nav");
+  const previous = element("button", "period-nav__button", labels[mode][0]);
+  const today = element("button", "period-nav__today", "今日へ");
+  const next = element("button", "period-nav__button", labels[mode][1]);
+  previous.type = today.type = next.type = "button";
+  previous.addEventListener("click", () => navigatePeriod(mode, -1).catch(showFatalError));
+  next.addEventListener("click", () => navigatePeriod(mode, 1).catch(showFatalError));
+  today.addEventListener("click", () => navigateToToday(mode).catch(showFatalError));
+  nav.append(previous, today, next);
+  return nav;
+}
+
+async function navigatePeriod(mode, direction) {
+  const current = state.selectedDate || state.today;
+  setConnection("idle", "期間データ取得中");
+  if (mode === "day") {
+    await loadDayContext(addDays(current, direction));
+    return;
+  }
+  if (mode === "week") {
+    state.selectedDate = addDays(current, direction * 7);
+    const start = startOfWeek(state.selectedDate);
+    await ensureSessionsForRange(start, addDays(start, 6));
+  } else {
+    state.selectedDate = addMonths(current, direction);
+    const range = monthRange(state.selectedDate);
+    await ensureSessionsForRange(range.start, range.end);
+  }
+  renderDashboard();
+  setConnection("ready", "最新データ");
+}
+
+async function navigateToToday(mode) {
+  state.selectedDate = state.today;
+  if (mode === "day") {
+    await loadDayContext(state.today);
+    return;
+  }
+  if (mode === "week") {
+    const start = startOfWeek(state.today);
+    await ensureSessionsForRange(start, addDays(start, 6));
+  } else {
+    const range = monthRange(state.today);
+    await ensureSessionsForRange(range.start, range.end);
+  }
+  state.viewMode = mode;
+  renderDashboard();
+  setConnection("ready", "最新データ");
+}
+
+async function ensureSessionsForRange(start, end) {
+  const result = await records("sessions", { sessionDate: { $gte: start, $lte: end }, sportProfileId: config.sportProfileId }, "sessionDate", "ASC", 500);
+  const merged = new Map(state.sessions.map(item => [item.sessionId, item]));
+  (result.records || []).forEach(item => merged.set(item.sessionId, item));
+  state.sessions = [...merged.values()].sort((a, b) => String(a.sessionDate).localeCompare(String(b.sessionDate)));
+}
+
+function sessionOutline(session) {
+  if (!session) return [];
+  const raw = String(session.bridge || "").trim();
+  if (!raw) return session.purpose ? [session.purpose] : [];
+  return raw.split(/→|\n+/).map(item => item.trim()).filter(Boolean).slice(0, 5);
+}
+
+function monthMainText(session) {
+  const outline = sessionOutline(session);
+  if (outline.length) return outline[0];
+  return session.purpose || session.title || session.role || "";
 }
 
 function renderHistory() {
@@ -791,6 +895,14 @@ function addDays(date, amount) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + amount);
   return value.toISOString().slice(0, 10);
+}
+
+function addMonths(date, amount) {
+  const [year, month, day] = date.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + amount, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  return target.toISOString().slice(0, 10);
 }
 
 function monthRange(date) {
