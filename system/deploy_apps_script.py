@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import hashlib
-import json, os, sys, urllib.request, urllib.parse, urllib.error
+import json, os, sys, time, urllib.request, urllib.parse, urllib.error
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCRIPT_API = "https://script.googleapis.com/v1"
@@ -159,17 +159,34 @@ def main():
         token=token,
     )
 
-    deployment_readback = http_json(
-        f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
-        token=token,
-    )
-    if deployment_readback.get("deploymentId") != deployment_id:
-        raise RuntimeError("DEPLOYMENT_ID_VERIFIED failed: deploymentId mismatch")
-    verified_cfg = deployment_readback.get("deploymentConfig") or {}
+    deployment_readback = None
+    verified_cfg = {}
+    observed_version = None
+    observed_version_number = None
+    for readback_attempt in range(10):
+        deployment_readback = http_json(
+            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
+            token=token,
+        )
+        if deployment_readback.get("deploymentId") != deployment_id:
+            raise RuntimeError("DEPLOYMENT_ID_VERIFIED failed: deploymentId mismatch")
+        verified_cfg = deployment_readback.get("deploymentConfig") or {}
+        observed_version = verified_cfg.get("versionNumber")
+        try:
+            observed_version_number = int(observed_version)
+        except (TypeError, ValueError):
+            observed_version_number = None
+        if observed_version_number == int(version_number):
+            break
+        if readback_attempt < 9:
+            time.sleep(2)
+
     if verified_cfg.get("scriptId") != script_id:
         raise RuntimeError("DEPLOYMENT_ID_VERIFIED failed: deploymentConfig.scriptId mismatch")
-    if verified_cfg.get("versionNumber") != version_number:
-        raise RuntimeError("DEPLOYMENT_VERSION_VERIFIED failed: deploymentConfig.versionNumber mismatch")
+    if observed_version_number != int(version_number):
+        raise RuntimeError(
+            f"DEPLOYMENT_VERSION_VERIFIED failed: expected={version_number}, observed={observed_version}"
+        )
     if verified_cfg.get("manifestFileName") != manifest_name:
         raise RuntimeError("DEPLOYMENT_MANIFEST_VERIFIED failed: deploymentConfig.manifestFileName mismatch")
 
