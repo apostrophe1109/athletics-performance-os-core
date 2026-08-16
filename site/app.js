@@ -504,7 +504,7 @@ function renderWeekView() {
   wrap.append(renderPeriodNavigator("week"));
   const start = startOfWeek(state.selectedDate || state.today);
   const dates = Array.from({ length: 7 }, (_, index) => addDays(start, index));
-  const header = sectionHeader("週間トレーニング", `${formatJapaneseDate(dates[0])} – ${formatJapaneseDate(dates[6])}`);
+  const header = sectionHeader("今週のトレーニング", `${formatJapaneseDate(dates[0])} – ${formatJapaneseDate(dates[6])}`);
   const scores = dates.map(date => daySessions(date).map(sessionIntensity).filter(value => value !== null)).flat();
   const average = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "—";
   header.append(pill(`週平均 ${average}/10`, true));
@@ -518,18 +518,31 @@ function renderWeekView() {
     const card = element("button", "week-day");
     card.type = "button";
     card.dataset.today = String(date === state.today);
-    card.append(
+
+    const top = element("div", "week-day__top");
+    top.append(
       element("span", "week-day__date", `${date.slice(8)} ${weekdayName(date)}`),
-      element("span", "week-day__body", primary?.title || primary?.role || "予定なし"),
+      element("span", "week-day__role", compactTrainingLabel(primary)),
       intensityMini(score)
     );
-    if (primary?.purpose) card.append(element("span", "week-day__sub", primary.purpose));
-    const outline = sessionOutline(primary);
-    if (outline.length) {
+    card.append(top);
+
+    const title = primary?.title || primary?.role || "予定なし";
+    card.append(element("strong", "week-day__body", title));
+
+    const highlights = sessionHighlights(primary, 3);
+    if (highlights.length) {
       const details = element("ul", "week-day__details");
-      outline.forEach(item => details.append(element("li", "", item)));
+      highlights.forEach(item => details.append(element("li", "", item)));
       card.append(details);
     }
+
+    if (primary?.purpose) {
+      const intent = element("p", "week-day__intent");
+      intent.append(element("span", "", "意図"), document.createTextNode(` ${primary.purpose}`));
+      card.append(intent);
+    }
+
     card.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
     list.append(card);
   });
@@ -563,7 +576,7 @@ function renderMonthView() {
     if (score !== null) cell.append(intensityMini(score));
     if (primary) {
       cell.append(
-        element("span", "month-day__role", primary.role || shortLabel(primary.title || "PLAN")),
+        element("span", "month-day__role", compactTrainingLabel(primary)),
         element("span", "month-day__main", monthMainText(primary))
       );
     }
@@ -641,13 +654,41 @@ function sessionOutline(session) {
   if (!session) return [];
   const raw = String(session.bridge || "").trim();
   if (!raw) return session.purpose ? [session.purpose] : [];
-  return raw.split(/→|\n+/).map(item => item.trim()).filter(Boolean).slice(0, 5);
+  return raw.split(/→|\n+/).map(item => item.trim()).filter(Boolean).slice(0, 7);
+}
+
+function sessionHighlights(session, maxItems = 3) {
+  if (!session) return [];
+  const outline = sessionOutline(session);
+  if (!outline.length) return [];
+  const mainPattern = /全助走|短助走|トリプル|跳躍|踏切|ダッシュ|全力走|スプリント|max-v|ハングクリーン|クリーン|スクワット|bsq|バウンディング|テンポ|ポゴ|メディシン|mb|投げ/i;
+  const warmupPattern = /ウォーム|ストレッチ|モビリティ|可動域|腹圧|深部体幹/i;
+  const prioritized = [
+    ...outline.filter(item => mainPattern.test(item) && !warmupPattern.test(item)),
+    ...outline.filter(item => !mainPattern.test(item) && !warmupPattern.test(item)),
+    ...outline.filter(item => warmupPattern.test(item))
+  ];
+  return [...new Set(prioritized)].slice(0, maxItems);
+}
+
+function compactTrainingLabel(session) {
+  if (!session) return "—";
+  const raw = [session.role, session.title, session.intensity].filter(Boolean).join(" ").toUpperCase();
+  if (/REST/.test(raw) && !/ACTIVE/.test(raw)) return "REST";
+  if (/RECOVERY|ACTIVE_REST|CONDITION/.test(raw)) return "REC";
+  if (/COMPETITION|MEET|SPECIFIC|SIMULATION/.test(raw)) return "SPEC";
+  if (/WEIGHT|POWER|STRENGTH|CLEAN|SQUAT/.test(raw)) return "POW";
+  if (/TRIPLE|JUMP|跳躍/.test(raw)) return "JUMP";
+  if (/RUN-UP|CONTROL|APPROACH|助走/.test(raw)) return "RUN";
+  if (/PLYOMETRIC|ELASTIC|BOUND|POGO/.test(raw)) return "ELASTIC";
+  if (/SPEED|SPRINT|MAX-V|ENDURANCE/.test(raw)) return "SPEED";
+  return shortLabel(session.role || session.title || "PLAN").slice(0, 8);
 }
 
 function monthMainText(session) {
-  const outline = sessionOutline(session);
-  if (outline.length) return outline[0];
-  return session.purpose || session.title || session.role || "";
+  const highlights = sessionHighlights(session, 2);
+  if (highlights.length) return highlights.join(" / ");
+  return session.title || session.purpose || session.role || "";
 }
 
 function renderHistory() {

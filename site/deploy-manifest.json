@@ -1,29 +1,29 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_029c10ab37e5494b8529f973ce02c6fc",
-  "generatedAt": "2026-08-16T04:55:08.307Z",
-  "baseCommitSha": "cc584b20886b1f6b601649f5de5323cc24391d44",
-  "changeReason": "承認済みAPOS v2.2.0日別メニュー強化を反映し、今日の練習コンセプトとウォーミングアップから補強・クールダウンまでを数値込みで一覧表示する。",
+  "deploymentId": "SITEDEPLOY_83fb898b831d4a5fa1f27287365f596e",
+  "generatedAt": "2026-08-16T05:47:59.326Z",
+  "baseCommitSha": "b835addeaddd5468d458f5420456a33429ab7e38",
+  "changeReason": "承認済みの週・月表示改善を反映する。週表示は各日カードに日付・主目的ラベル・強度・メインメニュー最大3件・その日の意図を固定表示して一目で把握できるようにする。月表示は7列カレンダーを維持し、各日セルに短い主目的ラベルとメイン内容最大2件を表示する。",
   "files": [
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "9e94753aac544a5c8f9a992b4c0e4e7c5139bd38286bddaf6269b1ebc34217fb"
+      "contentHash": "c1908996e7969887537ae076f54d56b977867440a64fe748bb8cf39d8ca26a73"
     },
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "9e7a2e45ebdcd946da8229ca04d354bc075df98a22560bc960038d2efcd6ceba"
+      "contentHash": "1ab1889c361e0be718e24eb2dcb0072dc1fabe11598138149d46136b26aa6d9c"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "cb5f9c92fc22441c9a01c317f978ad5c762b803270472eda1bc21887d81c22d2"
+      "contentHash": "727a1d58a12a00250aa7093696b2bb3917bee9760967aceaf024ba77f4c6af8a"
     },
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "ae2e321ebc9f56ab7d3bec07e48fbd0aff5b0d9d65794b8f5d1bae28ffc47dfc"
+      "contentHash": "e670cc30a6a4038f252018c2f64a26916cfbe04ee0e33cca2d4dc769e17acd06"
     }
   ]
 }
