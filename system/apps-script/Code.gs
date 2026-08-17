@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Google Apps Script API
- * Version: 1.2.2
+ * Version: 1.2.3
  * Target spreadsheet:
  *   1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw
  *
@@ -14,7 +14,7 @@
  */
 
 var APOS_CONFIG = Object.freeze({
-  API_VERSION: '1.2.2',
+  API_VERSION: '1.2.3',
   SCHEMA_VERSION: '1.1.0',
   SYSTEM_NAME: 'Athletics Performance OS',
   SPREADSHEET_ID: '1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw',
@@ -1191,10 +1191,31 @@ function APOS_executeRowMutation_(locked, approval) {
     return { kind: 'DELETE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: oldRow, afterRow: null, afterRecord: null };
   }
   var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];
+  var beforeExpectedRow = APOS_recordToRow_(entity, locked.before, headers);
   var afterRow = APOS_recordToRow_(entity, afterRecord, headers);
+  var changedCells = [];
   APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);
-  sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);
-  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, afterRecord: afterRecord };
+  for (var col = 0; col < headers.length; col++) {
+    var field = headers[col];
+    var beforeValue = locked.before ? locked.before[field] : null;
+    var afterValue = afterRecord ? afterRecord[field] : null;
+    if (APOS_stableStringify_(beforeValue) === APOS_stableStringify_(afterValue)) continue;
+    changedCells.push({ column: col + 1, beforeValue: beforeExpectedRow[col], afterValue: afterRow[col] });
+  }
+  try {
+    changedCells.forEach(function(cellChange) {
+      sheet.getRange(found.rowNumber, cellChange.column).setValue(cellChange.afterValue);
+    });
+  } catch (error) {
+    for (var restoreIndex = changedCells.length - 1; restoreIndex >= 0; restoreIndex--) {
+      try {
+        var restoreCell = changedCells[restoreIndex];
+        sheet.getRange(found.rowNumber, restoreCell.column).setValue(restoreCell.beforeValue);
+      } catch (ignore) {}
+    }
+    throw error;
+  }
+  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, afterRecord: afterRecord };
 }
 
 function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {
@@ -1282,7 +1303,14 @@ function APOS_revertRowChange_(change) {
     return;
   }
   if (change.kind === 'UPDATE') {
-    sheet.getRange(change.rowNumber, 1, 1, change.beforeRow.length).setValues([change.beforeRow]);
+    if (Array.isArray(change.changedCells) && change.changedCells.length) {
+      for (var updateIndex = change.changedCells.length - 1; updateIndex >= 0; updateIndex--) {
+        var changedCell = change.changedCells[updateIndex];
+        sheet.getRange(change.rowNumber, changedCell.column).setValue(changedCell.beforeValue);
+      }
+    } else {
+      sheet.getRange(change.rowNumber, 1, 1, change.beforeRow.length).setValues([change.beforeRow]);
+    }
     return;
   }
   if (change.kind === 'DELETE') {
