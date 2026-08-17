@@ -1199,7 +1199,7 @@ function APOS_executeRowMutation_(locked, approval) {
 
 function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {
   // sessions.startTime is canonical text (HH:MM). Google Sheets can otherwise
-  // auto-coerce values such as \"14:30\" into a time serial, which breaks exact
+  // auto-coerce values such as "14:30" into a time serial, which breaks exact
   // read-back verification and the canonical text contract.
   if (entity !== 'sessions') return;
   var startTimeCol = headers.indexOf('startTime');
