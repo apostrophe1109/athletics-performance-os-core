@@ -9,7 +9,26 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 def apply_approved_start_time_fix(source):
+    if " * Version: 1.2.3" in source and "changedCells: changedCells" in source:
+        return source
     if " * Version: 1.2.2" in source and "function APOS_prepareStorageFormats_(" in source:
+        replacements_v123 = [
+            (" * Version: 1.2.2", " * Version: 1.2.3"),
+            ("  API_VERSION: '1.2.2',", "  API_VERSION: '1.2.3',"),
+            (
+                "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);\n  sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);\n  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, afterRecord: afterRecord };",
+                "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var beforeExpectedRow = APOS_recordToRow_(entity, locked.before, headers);\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  var changedCells = [];\n  APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);\n  for (var col = 0; col < headers.length; col++) {\n    var field = headers[col];\n    var beforeValue = locked.before ? locked.before[field] : null;\n    var afterValue = afterRecord ? afterRecord[field] : null;\n    if (APOS_stableStringify_(beforeValue) === APOS_stableStringify_(afterValue)) continue;\n    changedCells.push({ column: col + 1, beforeValue: beforeExpectedRow[col], afterValue: afterRow[col] });\n  }\n  try {\n    changedCells.forEach(function(cellChange) {\n      sheet.getRange(found.rowNumber, cellChange.column).setValue(cellChange.afterValue);\n    });\n  } catch (error) {\n    for (var restoreIndex = changedCells.length - 1; restoreIndex >= 0; restoreIndex--) {\n      try {\n        var restoreCell = changedCells[restoreIndex];\n        sheet.getRange(found.rowNumber, restoreCell.column).setValue(restoreCell.beforeValue);\n      } catch (ignore) {}\n    }\n    throw error;\n  }\n  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, afterRecord: afterRecord };",
+            ),
+            (
+                "  if (change.kind === 'UPDATE') {\n    sheet.getRange(change.rowNumber, 1, 1, change.beforeRow.length).setValues([change.beforeRow]);\n    return;\n  }",
+                "  if (change.kind === 'UPDATE') {\n    if (Array.isArray(change.changedCells) && change.changedCells.length) {\n      for (var updateIndex = change.changedCells.length - 1; updateIndex >= 0; updateIndex--) {\n        var changedCell = change.changedCells[updateIndex];\n        sheet.getRange(change.rowNumber, changedCell.column).setValue(changedCell.beforeValue);\n      }\n    } else {\n      sheet.getRange(change.rowNumber, 1, 1, change.beforeRow.length).setValues([change.beforeRow]);\n    }\n    return;\n  }",
+            ),
+        ]
+        for find, replace in replacements_v123:
+            count = source.count(find)
+            if count != 1:
+                raise RuntimeError(f"Approved partial UPDATE fix precondition mismatch: expected 1, actual {count}")
+            source = source.replace(find, replace, 1)
         return source
     replacements = [
         (" * Version: 1.2.1", " * Version: 1.2.2"),

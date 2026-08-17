@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_5ab86809a1c14cd99d6274e685b41dba",
-  "generatedAt": "2026-08-17T08:17:25.200Z",
-  "baseCommitSha": "b96bce9c9d55a579bc8ff72b696508c5b03b08d8",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、deploy script生成形式のclean 1.2.2でsource parityを確認する。",
+  "deploymentId": "SITEDEPLOY_63c31c973726486e970dfdb558eea71f",
+  "generatedAt": "2026-08-17T13:35:28.969Z",
+  "baseCommitSha": "c17361608fbcb77c287989116b110040691ba2bb",
+  "changeReason": "承認済み開始時刻変更を完遂するため、Apps ScriptのUPDATEを変更列のみ書き込み・変更列のみ復元する1.2.3対応へ修正する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "fc49cb3f1fab959aa1b2370c6e62105ce8a342be8861588a23bf7031e5eeccba"
+      "contentHash": "01e7f4514cc79b240f74c69725d3a6d36725fab511eac6eb4762849b57327dfc"
     }
   ]
 }
