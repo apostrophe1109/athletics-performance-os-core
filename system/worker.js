@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.16
+ * Version: 1.4.17
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.16";
+const VERSION = "1.4.17";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1334,9 +1334,9 @@ function maintenanceEnv(env) {
 }
 
 function maintenanceChangeEnv(payload, env) {
-  const changes = Array.isArray(payload?.changes)
-    ? payload.changes
-    : (Array.isArray(payload?.lockedPreview?.changes) ? payload.lockedPreview.changes : []);
+  const directChanges = Array.isArray(payload?.changes) ? payload.changes : [];
+  const lockedChanges = Array.isArray(payload?.lockedPreview?.changes) ? payload.lockedPreview.changes : [];
+  const changes = directChanges.length ? directChanges : lockedChanges;
   const workflowPatchOnly = changes.length > 0 && changes.every(change =>
     MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST.has(String(change?.path || ""))
     && String(change?.mode || "") === "PATCH_TEXT"

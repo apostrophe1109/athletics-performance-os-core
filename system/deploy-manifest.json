@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_c1e8a6b852c1474ba08e31b2be98b104",
-  "generatedAt": "2026-08-17T07:33:52.270Z",
-  "baseCommitSha": "157af98fd82e9922a9d50a5bc860d3c7f43da2cc",
-  "changeReason": "今回の障害解消チェーン特例承認に基づき、workflow Apply時もlockedPreview.changesから安全なallowlist判定を行えるよう修正する。",
+  "deploymentId": "SITEDEPLOY_f0c1b0960f0844e4a15a1056c8e77ee4",
+  "generatedAt": "2026-08-17T07:35:30.560Z",
+  "baseCommitSha": "97af093734504be3e86b29b6b2e6d1505198772c",
+  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、Maintenance Apply時の空changesフォールバック不具合を修正する。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "814fd104eacdbf08f77561d2aafd25ee904874547a47db12fbd15ad45b7c0c73"
+      "contentHash": "b109e92c1da8325d11c197858351263443e08d92f36b9e1aa99e041b08516673"
     }
   ]
 }
