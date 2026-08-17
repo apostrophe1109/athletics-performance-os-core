@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Google Apps Script API
- * Version: 1.2.1
+ * Version: 1.2.2
  * Target spreadsheet:
  *   1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw
  *
@@ -14,7 +14,7 @@
  */
 
 var APOS_CONFIG = Object.freeze({
-  API_VERSION: '1.2.1',
+  API_VERSION: '1.2.2',
   SCHEMA_VERSION: '1.1.0',
   SYSTEM_NAME: 'Athletics Performance OS',
   SPREADSHEET_ID: '1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw',
@@ -116,6 +116,82 @@ var APOS_SECRET_KEY_PATTERN = /(token|secret|password|private.?key|api.?key|oaut
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action ? String(e.parameter.action) : 'health';
+  if (action === '__backendProbe') {
+    var mode = e && e.parameter && e.parameter.mode ? String(e.parameter.mode) : '';
+    var started = Date.now();
+    try {
+      if (mode === 'drive') {
+        var file = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        file.getName();
+      } else if (mode === 'makecopy') {
+        var originalFile = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        var copyFile = originalFile.makeCopy('APOS Backend Recovery Candidate ' + new Date().toISOString());
+        return APOS_json_({ success: true, status: 'COPY_CREATED', copyId: copyFile.getId() });
+      } else if (mode === 'opencopy') {
+        var copyId = e && e.parameter && e.parameter.copyId ? String(e.parameter.copyId) : '';
+        if (!copyId) throw new Error('COPY_ID_REQUIRED');
+        var copySs = SpreadsheetApp.openById(copyId);
+        var copySheetCount = copySs.getSheets().length;
+        PropertiesService.getScriptProperties().setProperty('APOS_SPREADSHEET_ID_RECOVERY_CANDIDATE', copyId);
+        return APOS_json_({ success: true, status: 'COPY_OPEN_OK', sheetCount: copySheetCount });
+      } else if (mode === 'openfile') {
+        var file2 = DriveApp.getFileById(APOS_CONFIG.SPREADSHEET_ID);
+        var ss2 = SpreadsheetApp.open(file2);
+        if (ss2.getId() !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+        ss2.getSheets().length;
+      } else if (mode === 'openurl') {
+        var ss3 = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/' + APOS_CONFIG.SPREADSHEET_ID + '/edit');
+        if (ss3.getId() !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+        ss3.getSheets().length;
+      } else if (mode === 'advanced') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var meta = Sheets.Spreadsheets.get(APOS_CONFIG.SPREADSHEET_ID, { fields: 'spreadsheetId' });
+        if (!meta || meta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+      } else if (mode === 'advancedvalues') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var sample = Sheets.Spreadsheets.Values.get(APOS_CONFIG.SPREADSHEET_ID, "'08_セッション'!A1:B3", {
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'FORMATTED_STRING'
+        });
+        if (!sample || !sample.values || !sample.values.length) throw new Error('VALUES_EMPTY');
+      } else if (mode === 'advancedgrid') {
+        if (typeof Sheets === 'undefined') throw new Error('ADVANCED_SHEETS_UNAVAILABLE');
+        var grid = Sheets.Spreadsheets.get(APOS_CONFIG.SPREADSHEET_ID, {
+          ranges: ["'08_セッション'!A1:B3"],
+          includeGridData: true,
+          fields: 'sheets(data(rowData(values(effectiveValue,formattedValue))))'
+        });
+        var rows = grid && grid.sheets && grid.sheets[0] && grid.sheets[0].data && grid.sheets[0].data[0] && grid.sheets[0].data[0].rowData;
+        if (!rows || !rows.length) throw new Error('GRID_DATA_EMPTY');
+      } else if (mode === 'rest') {
+        var token = ScriptApp.getOAuthToken();
+        var response = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '?fields=spreadsheetId', {
+          method: 'get',
+          headers: { Authorization: 'Bearer ' + token },
+          muteHttpExceptions: true
+        });
+        if (response.getResponseCode() !== 200) throw new Error('SHEETS_REST_HTTP_' + response.getResponseCode());
+        var restMeta = JSON.parse(response.getContentText() || '{}');
+        if (restMeta.spreadsheetId !== APOS_CONFIG.SPREADSHEET_ID) throw new Error('SPREADSHEET_ID_MISMATCH');
+      } else if (mode === 'restvalues') {
+        var token2 = ScriptApp.getOAuthToken();
+        var rangeText = encodeURIComponent("'08_セッション'!A1:B3");
+        var response2 = UrlFetchApp.fetch('https://sheets.googleapis.com/v4/spreadsheets/' + APOS_CONFIG.SPREADSHEET_ID + '/values/' + rangeText + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING', {
+          method: 'get',
+          headers: { Authorization: 'Bearer ' + token2 },
+          muteHttpExceptions: true
+        });
+        if (response2.getResponseCode() !== 200) throw new Error('SHEETS_REST_VALUES_HTTP_' + response2.getResponseCode());
+        var restValues = JSON.parse(response2.getContentText() || '{}');
+        if (!restValues.values || !restValues.values.length) throw new Error('VALUES_EMPTY');
+      } else {
+        return APOS_json_({ success: false, status: 'PROBE_MODE_INVALID', mode: mode });
+      }
+      return APOS_json_({ success: true, status: 'PROBE_OK', mode: mode, elapsedMs: Date.now() - started });
+    } catch (error) {
+      return APOS_json_({ success: false, status: 'PROBE_ERROR', mode: mode, errorType: String(error && error.name || 'Error'), elapsedMs: Date.now() - started });
+    }
+  }
   if (action !== 'health') {
     return APOS_json_({ success: false, code: 'POST_REQUIRED', error: 'health以外はPOSTを使用してください。', version: APOS_CONFIG.API_VERSION });
   }
@@ -1180,6 +1256,7 @@ function APOS_executeRowMutation_(locked, approval) {
     if (found) APOS_throw_('CONCURRENT_DUPLICATE_KEY', 'Preview後に同じIDが追加されました。');
     var insertValues = APOS_recordToRow_(entity, afterRecord, headers);
     var newRow = Math.max(sheet.getLastRow() + 1, 2);
+    APOS_prepareStorageFormats_(sheet, newRow, headers, entity);
     sheet.getRange(newRow, 1, 1, headers.length).setValues([insertValues]);
     return { kind: 'INSERT', sheetName: config.sheet, rowNumber: newRow, beforeRow: null, afterRow: insertValues, afterRecord: afterRecord };
   }
@@ -1191,8 +1268,19 @@ function APOS_executeRowMutation_(locked, approval) {
   }
   var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];
   var afterRow = APOS_recordToRow_(entity, afterRecord, headers);
+  APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);
   sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);
   return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, afterRecord: afterRecord };
+}
+
+function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {
+  // sessions.startTime is canonical text (HH:MM). Google Sheets can otherwise
+  // auto-coerce values such as \"14:30\" into a time serial, which breaks exact
+  // read-back verification and the canonical text contract.
+  if (entity !== 'sessions') return;
+  var startTimeCol = headers.indexOf('startTime');
+  if (startTimeCol < 0) return;
+  sheet.getRange(rowNumber, startTimeCol + 1).setNumberFormat('@');
 }
 
 function APOS_verifyMutationResult_(locked, expectedAfter) {
