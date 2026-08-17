@@ -36,6 +36,7 @@ const state = {
   measurementLoading: false,
   exerciseDetailCache: new Map(),
   exerciseDetailLoadingId: "",
+  openDayMenuDetails: new Set(),
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 state.selectedDate = state.today;
@@ -45,6 +46,7 @@ const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
 const refreshButton = document.querySelector("#refresh-button");
 refreshButton?.addEventListener("click", () => refreshVisibleData().catch(showFatalError));
+installTapFeedback();
 
 boot().catch(error => {
   if (error?.code === "WEB_AUTH_REQUIRED") showLogin("セッションの有効期限が切れました。もう一度認証してください。");
@@ -343,7 +345,13 @@ function renderDayMenuSections(context, sessions) {
     const score = Number.isFinite(item.intensityScore) ? item.intensityScore : null;
     const row = element("li", "day-menu-row");
     row.dataset.intensityBand = intensityBand(score);
-    row.title = `強度 ${score}/10`;
+
+    const detailKey = dayMenuDetailKey(item, index);
+    const expanded = state.openDayMenuDetails.has(detailKey);
+    const toggle = element("button", "day-menu-row__toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.title = `強度 ${score}/10・タップで詳細表示`;
 
     const copy = element("div", "day-menu-row__copy");
     const titleLine = element("div", "day-menu-row__title");
@@ -355,11 +363,21 @@ function renderDayMenuSections(context, sessions) {
     if (item.detail) copy.append(element("span", "", item.detail));
 
     const meta = element("div", "day-menu-row__meta");
-    if (score !== null) {
-      meta.append(element("span", "day-menu-row__intensity", `${score}/10`));
-    }
+    if (score !== null) meta.append(element("span", "day-menu-row__intensity", `${score}/10`));
     if (item.dose) meta.append(element("span", "day-menu-row__dose", item.dose));
-    row.append(copy, meta);
+    meta.append(element("span", "day-menu-row__chevron", "⌄"));
+    toggle.append(copy, meta);
+
+    const detail = element("div", "day-menu-row__detail");
+    detail.dataset.open = String(expanded);
+    const detailInner = element("div", "day-menu-row__detail-inner");
+    renderDayMenuDetail(detailInner, item, score, state.exerciseDetailCache.get(item.exerciseId) || null);
+    detail.append(detailInner);
+
+    toggle.addEventListener("click", () => {
+      toggleDayMenuDetail(detailKey, item, score, toggle, detail, detailInner).catch(showFatalError);
+    });
+    row.append(toggle, detail);
     list.append(row);
   });
   block.append(blockHead, list);
@@ -447,7 +465,8 @@ function dayMenuEntries(context, sessions) {
           item.intensity
         ),
         intensityEstimated: false,
-        exerciseId: item.exerciseId || item.sourceExerciseId || null
+        exerciseId: item.exerciseId || item.sourceExerciseId || null,
+        session: sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null
       };
     });
   }
@@ -462,7 +481,8 @@ function dayMenuEntries(context, sessions) {
         section: inferDayMenuSection(value),
         intensityScore: estimated,
         intensityEstimated: false,
-        exerciseId: null
+        exerciseId: null,
+        session
       };
     }));
   if (bridgeEntries.length) return bridgeEntries;
@@ -474,8 +494,115 @@ function dayMenuEntries(context, sessions) {
     section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" ")),
     intensityScore: sessionIntensity(session),
     intensityEstimated: false,
-    exerciseId: null
+    exerciseId: null,
+    session
   }));
+}
+
+function dayMenuDetailKey(item, index) {
+  return `${state.selectedDate}|${index}|${item.exerciseId || item.title}`;
+}
+
+async function toggleDayMenuDetail(key, item, score, toggle, detail, detailInner) {
+  const opening = !state.openDayMenuDetails.has(key);
+  if (!opening) {
+    state.openDayMenuDetails.delete(key);
+    toggle.setAttribute("aria-expanded", "false");
+    detail.dataset.open = "false";
+    return;
+  }
+
+  state.openDayMenuDetails.add(key);
+  toggle.setAttribute("aria-expanded", "true");
+  detail.dataset.open = "true";
+  renderDayMenuDetail(detailInner, item, score, state.exerciseDetailCache.get(item.exerciseId) || null);
+
+  if (!item.exerciseId || state.exerciseDetailCache.has(item.exerciseId)) return;
+  detailInner.append(element("p", "day-menu-detail__loading", "種目マスターの詳細を読み込み中…"));
+  try {
+    const result = await api("getRecord", { entity: "exercises", key: item.exerciseId });
+    const exercise = result.record || null;
+    if (exercise) state.exerciseDetailCache.set(item.exerciseId, exercise);
+    if (state.openDayMenuDetails.has(key)) renderDayMenuDetail(detailInner, item, score, exercise);
+  } catch (error) {
+    console.warn("day menu exercise detail load failed", error);
+    if (state.openDayMenuDetails.has(key)) {
+      renderDayMenuDetail(detailInner, item, score, null);
+      detailInner.append(element("p", "day-menu-detail__loading", "種目マスター詳細を取得できませんでした。基本ガイドを表示しています。"));
+    }
+  }
+}
+
+function renderDayMenuDetail(container, item, score, exercise) {
+  container.replaceChildren();
+  const facts = element("div", "day-menu-detail__facts");
+  facts.append(
+    dayMenuFact("強度", `${score}/10`),
+    dayMenuFact("設定", item.dose || exercise?.initialPrescription || "当日の指定どおり"),
+    dayMenuFact("休息", exercise?.rest || dayMenuRestFromTitle(item.title) || "メニュー表記どおり")
+  );
+  container.append(facts);
+
+  appendDayMenuGuide(container, "狙い", exercise?.mainPurpose || dayMenuSectionPurpose(item.section));
+  appendDayMenuGuide(container, "やり方・手順", exercise?.instructions || dayMenuFallbackInstructions(item));
+  appendDayMenuGuide(container, "意識するポイント", exercise?.cue || item.detail || dayMenuSectionCue(item.section));
+  appendDayMenuGuide(container, "成功の感覚", exercise?.successFeeling);
+  appendDayMenuGuide(container, "避けること", exercise?.avoid);
+  appendDayMenuGuide(container, "終了基準", exercise?.stopCondition || item.session?.stopCondition);
+  appendDayMenuGuide(container, "三段跳への接続", exercise?.bridge);
+}
+
+function dayMenuFact(label, value) {
+  const fact = element("div", "day-menu-detail__fact");
+  fact.append(element("span", "", label), element("strong", "", value || "—"));
+  return fact;
+}
+
+function appendDayMenuGuide(parent, label, value) {
+  if (!String(value || "").trim()) return;
+  const section = element("section", "day-menu-detail__section");
+  section.append(element("h4", "", label), element("p", "", value));
+  parent.append(section);
+}
+
+function dayMenuSectionPurpose(section) {
+  const map = {
+    warmup: "体温と可動域を上げ、次の高速動作へ安全につなげる。",
+    primer: "神経系を起こし、接地とリズムを鋭くしてメイン練習の質を高める。",
+    sprint: "高い走速度と姿勢を保ち、助走速度・スピード持久力へつなげる。",
+    main: "助走から踏切・跳躍局面の質を高め、三段跳の実戦動作へつなげる。",
+    supplemental: "メイン動作を支える筋力・体幹・出力を補強する。",
+    cooldown: "緊張を下げ、回復へ移行する。",
+    other: "当日のセッション目的に沿って必要な適応を積み上げる。"
+  };
+  return map[section] || map.other;
+}
+
+function dayMenuSectionCue(section) {
+  const map = {
+    warmup: "動きを急がず、痛みのない範囲で徐々に可動域と速度を上げる。",
+    primer: "力み過ぎず、短い接地とリズムを優先する。",
+    sprint: "本数より質を優先し、姿勢・接地・速度が崩れたら休息を延ばす。",
+    main: "助走リズムと踏切姿勢を優先し、無理に距離だけを追わない。",
+    supplemental: "反動でごまかさず、狙った部位と姿勢を保つ。",
+    cooldown: "呼吸を整え、身体の緊張を落とす。",
+    other: "当日の目的と指定された量・強度を優先する。"
+  };
+  return map[section] || map.other;
+}
+
+function dayMenuFallbackInstructions(item) {
+  const title = String(item.title || "");
+  const split = title.match(/^\(([^)]+)\)×(\d+)set(?:\s+rest([0-9〜]+)min)?/i);
+  if (split) {
+    return `${split[1]}を1セットとして${split[2]}セット実施する。セット内は表記順に走り、${split[3] ? `セット間は${split[3]}分休息する。` : "セット間は十分に回復してから次へ進む。"}`;
+  }
+  return item.dose ? `${item.title}を「${item.dose}」の設定で実施する。` : `${item.title}を当日のメニュー表記どおり実施する。`;
+}
+
+function dayMenuRestFromTitle(title) {
+  const match = String(title || "").match(/rest([0-9〜]+)min/i);
+  return match ? `${match[1]}分` : "";
 }
 
 function intensityBand(score) {
@@ -1434,7 +1561,7 @@ function showLogin(message = "") {
   const panel = element("section", "panel panel--wide login-panel");
   const form = element("form", "login-form");
   const title = element("h2", "", "本人認証");
-  const copy = element("p", "login-copy", "専用パスフレーズを入力してください。完全に一致すると自動でAthletics Performance OSを開きます。");
+  const copy = element("p", "login-copy", "専用パスフレーズを入力してください。Face IDや自動入力で値が入ると、約0.1秒後に自動認証します。");
   const label = element("label", "login-label", "パスフレーズ");
   label.htmlFor = "web-password";
   const input = element("input", "login-input");
@@ -1450,33 +1577,60 @@ function showLogin(message = "") {
 
   let autoTimer = null;
   let authInFlight = false;
+  let queuedAuto = false;
   let lastAttemptedPassword = "";
-  let authSequence = 0;
+  let observedValue = "";
+  let watchTimer = null;
+
+  const pulseAutoButton = () => {
+    button.classList.remove("login-button--auto-press");
+    void button.offsetWidth;
+    button.classList.add("login-button--auto-press");
+    setTimeout(() => button.classList.remove("login-button--auto-press"), 240);
+  };
+
+  const scheduleAutoLogin = () => {
+    clearTimeout(autoTimer);
+    const value = input.value;
+    if (!value) {
+      lastAttemptedPassword = "";
+      status.textContent = "";
+      return;
+    }
+    status.textContent = "";
+    autoTimer = setTimeout(() => authenticate({ automatic: true }), 100);
+  };
 
   const authenticate = async ({ automatic = false } = {}) => {
     const password = input.value;
-    if (!password || authInFlight) return;
+    if (!password) return;
+    if (authInFlight) {
+      if (automatic) queuedAuto = true;
+      return;
+    }
     if (automatic && password === lastAttemptedPassword) return;
 
-    const sequence = ++authSequence;
     const submittedPassword = password;
     lastAttemptedPassword = password;
     authInFlight = true;
+    queuedAuto = false;
     button.disabled = true;
-    button.textContent = "認証中…";
-    if (!automatic) status.textContent = "";
+    button.textContent = automatic ? "自動認証中…" : "認証中…";
+    if (automatic) pulseAutoButton();
+    else status.textContent = "";
 
     try {
       const result = await authRequest("/auth/login", { password: submittedPassword });
-      if (sequence !== authSequence || input.value !== submittedPassword) return;
+      if (input.value !== submittedPassword) return;
       if (!result.success || !result.token) throw new Error(result.error || "認証に失敗しました。");
+      clearInterval(watchTimer);
       state.webSessionToken = result.token;
       sessionStorage.setItem("aposWebSession", result.token);
       input.value = "";
       setConnection("idle", "認証済み・読み込み中");
       await loadDashboardData();
     } catch (error) {
-      if (sequence !== authSequence) return;
+      if (input.value !== submittedPassword) return;
       if (error?.code === "WEB_AUTH_REQUIRED") {
         showLogin("セッションを確認できませんでした。もう一度認証してください。");
         return;
@@ -1486,29 +1640,24 @@ function showLogin(message = "") {
         input.select();
       }
     } finally {
-      if (sequence === authSequence) {
-        authInFlight = false;
+      authInFlight = false;
+      if (document.body.contains(button)) {
         button.disabled = false;
         button.textContent = "手動で認証";
       }
+      if (queuedAuto && input.value && input.value !== lastAttemptedPassword) scheduleAutoLogin();
     }
   };
 
-  const scheduleAutoLogin = () => {
-    clearTimeout(autoTimer);
-    authSequence += 1;
-    authInFlight = false;
-    const value = input.value;
-    if (!value) {
-      lastAttemptedPassword = "";
-      status.textContent = "";
-      return;
-    }
-    status.textContent = "";
-    autoTimer = setTimeout(() => authenticate({ automatic: true }), 320);
+  const detectPasswordValue = () => {
+    const current = input.value;
+    if (current === observedValue) return;
+    observedValue = current;
+    scheduleAutoLogin();
   };
 
-  input.addEventListener("input", scheduleAutoLogin);
+  input.addEventListener("input", detectPasswordValue);
+  input.addEventListener("change", detectPasswordValue);
   form.append(title, copy, label, input, button, status);
   form.addEventListener("submit", event => {
     event.preventDefault();
@@ -1517,7 +1666,38 @@ function showLogin(message = "") {
   });
   panel.append(form);
   dashboard.append(panel);
+  observedValue = input.value;
+  watchTimer = setInterval(() => {
+    if (!document.body.contains(input)) {
+      clearInterval(watchTimer);
+      return;
+    }
+    detectPasswordValue();
+  }, 50);
   input.focus();
+}
+
+function installTapFeedback() {
+  const selector = "button, [role='button']";
+  const release = () => {
+    document.querySelectorAll(".is-pressed").forEach(node => {
+      setTimeout(() => node.classList.remove("is-pressed"), 110);
+    });
+  };
+  document.addEventListener("pointerdown", event => {
+    const target = event.target.closest(selector);
+    if (!target || target.disabled) return;
+    target.classList.add("is-pressed");
+  }, { passive: true });
+  document.addEventListener("pointerup", release, { passive: true });
+  document.addEventListener("pointercancel", release, { passive: true });
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target.closest(selector);
+    if (!target || target.disabled) return;
+    target.classList.add("is-pressed");
+  });
+  document.addEventListener("keyup", release);
 }
 
 async function authRequest(path, payload) {
