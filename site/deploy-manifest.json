@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_cd3ea2bbaa5f4e26ba34f9dfd4ad12ae",
-  "generatedAt": "2026-08-17T06:55:22.728Z",
-  "baseCommitSha": "4b64d405ad455d8bb2b099694f489cf33b02207d",
-  "changeReason": "承認済みの音声入力・練習記録構造化要約機能をAPOS Viewへ反映する。",
+  "deploymentId": "SITEDEPLOY_fe540243545c41709c1270ee97a0fa42",
+  "generatedAt": "2026-08-17T22:00:24.166Z",
+  "baseCommitSha": "54829d6e3d92a0cce064f7ed622e3147cafacff8",
+  "changeReason": "承認済みの音声入力UI変更として、本日の練習内容を独立スクロール表示し、他UIへ重ならない構成をsiteへ反映して公開確認する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "955dc675c1eb1c7d47b0e4b067569512dd86b9d2fef4225818d8cbb854c6f849"
+      "contentHash": "caf4acf0efb21f42aeb972cd9e68806975d6bf6f839a18e03b5b137f11cb207e"
+    },
+    {
+      "path": "site/styles.css",
+      "operation": "UPSERT",
+      "contentHash": "bb2fe534820cc8c9ae3291ecaccee1c6f8361e5a8c86c3ba655c7fcf68eb4b05"
     }
   ]
 }

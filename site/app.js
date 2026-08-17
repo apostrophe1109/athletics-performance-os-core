@@ -960,6 +960,29 @@ function openRecordDialog(mode) {
     metaItem("強度", intensityText(sessionIntensity(primary)))
   );
 
+  let plannedMenu = null;
+  if (mode === "voice") {
+    plannedMenu = element("section", "record-planned-menu");
+    plannedMenu.setAttribute("aria-label", "本日の練習内容");
+
+    const plannedHead = element("div", "record-planned-menu__head");
+    plannedHead.append(
+      element("strong", "", "本日の練習内容"),
+      element("span", "", "見ながらそのまま音声入力できます")
+    );
+
+    const plannedList = element("ul", "record-planned-menu__list");
+    const context = state.dayContext || {};
+    const sessions = context.sessions || [];
+    const entries = dayMenuEntries(context, sessions);
+    if (entries.length) {
+      entries.forEach(item => plannedList.append(element("li", "", item.title)));
+    } else {
+      plannedList.append(element("li", "record-planned-menu__empty", "この日の詳細メニューは登録されていません。"));
+    }
+    plannedMenu.append(plannedHead, plannedList);
+  }
+
   const transcript = element("textarea", "record-textarea");
   transcript.rows = 9;
   transcript.placeholder = mode === "voice"
@@ -1057,7 +1080,7 @@ function openRecordDialog(mode) {
   });
 
   form.append(top, meta);
-  if (mode === "voice") form.append(voiceTools);
+  if (mode === "voice") form.append(plannedMenu, voiceTools);
   form.append(transcript, organize, preview, save, systemNote);
   dialog.append(form);
   document.body.append(dialog);
