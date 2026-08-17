@@ -16,6 +16,7 @@ const state = {
   dayContext: null,
   sessions: [],
   executions: [],
+  historySessions: [],
   measurements: [],
   exercises: [],
   events: [],
@@ -140,12 +141,16 @@ async function loadCompetitionData() {
 }
 
 async function loadSecondaryData() {
-  const [executions, measurements, exercises] = await Promise.all([
-    records("executions", { sportProfileId: config.sportProfileId }, "executionDate", "DESC", 6),
+  const historyStart = addDays(state.today, -14);
+  const historyEnd = addDays(state.today, -1);
+  const [executions, historySessions, measurements, exercises] = await Promise.all([
+    records("executions", { sportProfileId: config.sportProfileId, executionDate: { $gte: historyStart, $lte: state.today } }, "executionDate", "DESC", 50),
+    records("sessions", { sportProfileId: config.sportProfileId, sessionDate: { $gte: historyStart, $lte: historyEnd }, planStatus: { $ne: "ARCHIVED" } }, "sessionDate", "DESC", 30),
     records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 6),
     records("exercises", { sportProfileId: config.sportProfileId, status: { $ne: "ARCHIVED" } }, "yukiName", "ASC", 6)
   ]);
   state.executions = executions.records || [];
+  state.historySessions = historySessions.records || [];
   state.measurements = measurements.records || [];
   state.exercises = exercises.records || [];
   state.secondaryLoaded = true;
@@ -523,6 +528,11 @@ function judgeTrainingIntensity(value, session) {
     return 3;
   }
 
+  const compoundRun = /^\(\s*\d{2,3}m(?:\s*\+\s*\d{2,3}m)+\s*\)×\d+set/i.test(text.trim());
+  if (compoundRun) return Math.max(8, sessionIntensity(session) || 8);
+  if (/アクティブレスト|active[\s_-]*rest/i.test(text)) return 2;
+  if (/^\d+(?:〜\d+)?秒(?:休息)?$/.test(text.trim())) return 1;
+  if (/^\d+(?:〜\d+)?分休息$/.test(text.trim())) return 1;
   if (/休息|rest|完全休養|完全休息/.test(normalized)) return 1;
   if (/クール|整理運動|静的ストレッチ|呼吸/.test(normalized)) return 1;
   if (/ウォーム|動的モビリティ|モビリティ|可動域|aマーチ|マーチ/.test(normalized)) return 2;
@@ -1019,20 +1029,63 @@ async function searchExerciseLibrary(query) {
 
 function renderHistory() {
   const panel = element("section", "secondary-panel");
-  panel.append(sectionHeader("最近の実施記録", "保存済み"));
+  panel.append(sectionHeader("最近の実施記録", "保存済み＋REST自動判定"));
   const list = element("div", "card-list");
-  const items = state.executions.slice(0, 6);
+  const items = combinedHistoryItems().slice(0, 8);
   if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
   else if (!items.length) list.append(empty("実施記録はまだありません。"));
   items.forEach(item => {
+    if (item.kind === "rest") {
+      list.append(recordCard(
+        "REST完遂（自動判定）",
+        formatJapaneseDate(item.date),
+        `${item.session.title || "完全休養"} / 当日の実施記録が0件のため完遂扱い`
+      ));
+      return;
+    }
+    const execution = item.execution;
     list.append(recordCard(
-      item.exerciseName || item.exerciseId || "実施記録",
-      formatJapaneseDate(dateOnly(item.executionDate)),
-      [item.successes, item.improvements, item.voiceTranscriptNormalized].filter(Boolean).join(" / ")
+      execution.exerciseName || execution.exerciseId || "実施記録",
+      formatJapaneseDate(dateOnly(execution.executionDate)),
+      [execution.successes, execution.improvements, execution.voiceTranscriptNormalized].filter(Boolean).join(" / ")
     ));
   });
   panel.append(list);
   return panel;
+}
+
+function combinedHistoryItems() {
+  const executionDates = new Set(state.executions.map(item => dateOnly(item.executionDate)).filter(Boolean));
+  const executionItems = state.executions.map(execution => ({
+    kind: "execution",
+    date: dateOnly(execution.executionDate),
+    sortKey: `${dateOnly(execution.executionDate)}T${execution.recordedAt || "23:59:59"}`,
+    execution
+  }));
+  const restItems = state.historySessions
+    .filter(session => isExplicitCompletedRest(session, executionDates))
+    .map(session => ({
+      kind: "rest",
+      date: dateOnly(session.sessionDate),
+      sortKey: `${dateOnly(session.sessionDate)}T23:59:58`,
+      session
+    }));
+  return [...executionItems, ...restItems].sort((a, b) => String(b.sortKey).localeCompare(String(a.sortKey)));
+}
+
+function isExplicitCompletedRest(session, executionDates) {
+  const date = dateOnly(session?.sessionDate);
+  if (!date || date >= state.today || executionDates.has(date)) return false;
+  const role = String(session.role || "").toUpperCase();
+  const title = String(session.title || "");
+  const intensity = String(session.intensity || "").toUpperCase();
+  const requirements = String(session.requirements || "");
+  if (/ACTIVE[\s_-]*REST/.test(role) || /アクティブレスト/.test(title)) return false;
+  return role === "REST"
+    || role === "COMPLETE REST"
+    || intensity === "REST"
+    || /noTraining\s*=\s*true/i.test(requirements)
+    || /完全(?:レスト|休養)/.test(`${title} ${session.bridge || ""}`);
 }
 
 function renderExercises() {

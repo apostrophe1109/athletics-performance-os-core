@@ -1,24 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_f23f60c5058642fd96cff86632fcb63c",
-  "generatedAt": "2026-08-17T05:04:31.078Z",
-  "baseCommitSha": "acf52a4020e86fcd7f0f1467e03c78b0e89ae5fb",
-  "changeReason": "全トレーニング項目と日全体・週・月強度を同一3色ルールへ統一し、推定記号を廃止する。",
+  "deploymentId": "SITEDEPLOY_9d48e1c6e4eb491f80482c5869d53d7f",
+  "generatedAt": "2026-08-17T05:31:07.533Z",
+  "baseCommitSha": "645bb5e23890fdc10f63525f1da2c48e9cd485fb",
+  "changeReason": "複合ダッシュの1/10誤判定を修正し、REST無記録日の自動完遂判定表示を反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "871bcdace6ee71b53920555c3efa538b2f01c4ad0a48e92477381a08d2f76d63"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "ff9b8dbbb1181c4110d5ea9b7f425a6280ad4fdf78255f92a476f8093d2c3ca0"
+      "contentHash": "030eb7e14297efd4921c4d136263a217f0a5525296ebfd4505aa5ff74318dac7"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "010e946bf891d454ca6ee64b6dc951a029b32fda39fd1c97002cd3b062444b1d"
+      "contentHash": "83e2d6f776336aef65e61038f42fab65dc0ea64861d25a2fbefc4d07f7b4c345"
     }
   ]
 }
