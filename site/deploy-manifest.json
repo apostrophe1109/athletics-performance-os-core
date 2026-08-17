@@ -1,29 +1,29 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_78099f307f044ea5a3d25cea7494acc6",
-  "generatedAt": "2026-08-16T22:52:03.288Z",
-  "baseCommitSha": "a5414fc5bc41cb4d127f0b834366aef076eee2c6",
-  "changeReason": "承認済みのイラストなしUI再設計、3セクション切替、正本種目検索、計測スパークライン、ヘッダー整理を反映する。",
+  "deploymentId": "SITEDEPLOY_d2dc8682885344d8baa58ff6c40fa419",
+  "generatedAt": "2026-08-17T04:55:08.496Z",
+  "baseCommitSha": "9df5808d4862f46ac2d6ecb5bb97bedbff91e357",
+  "changeReason": "承認済みPreviewを反映し、日別メニューの強度色分けと種目詳細ダイアログを実装する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "fe903e41d2ad9a7dbb0304b7dbffb3fc4115bb3fb62250baac07f0e48d7194e7"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "b2bc75c742be01a021a7a767cc4b971a71d04280a5fa2183930eb08b8741bbcc"
+      "contentHash": "b814206f2a6ad75ba608850e116445c38239168b52c47fff5f866a52efd1e982"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "649b78efa13f82628b4548dcaaf2ea52bd1e0eeca3f37c2ee1fe33ca5c057c5d"
+      "contentHash": "aab148966940ac00202382d8aa9d2bcd880855f73b54a83bc7816e9701d6a6ba"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "c490db8837444971608d56e4e1b17c1ea0aeca6779fdf7f62e2c56bacadc1994"
     },
     {
       "path": "site/ui-layout.json",
       "operation": "UPSERT",
-      "contentHash": "e65498fe83399edb88115fb44ffbd764f5c4cccfe1c4e0a110caf5d86f1748c9"
+      "contentHash": "da854b132ea380d1a26be7ceb24541869096003ad08833450c74c00010bd76f8"
     }
   ]
 }

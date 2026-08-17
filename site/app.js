@@ -33,6 +33,8 @@ const state = {
   exerciseSearchError: "",
   measurementTrendsLoaded: false,
   measurementLoading: false,
+  exerciseDetailCache: new Map(),
+  exerciseDetailLoadingId: "",
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 state.selectedDate = state.today;
@@ -93,12 +95,37 @@ async function loadDayData(date, { force = false, render = true } = {}) {
   );
   const sessions = result.records || [];
   replaceSessionsForRange(date, date, sessions);
-  const context = { sessions, menuItems: [] };
+  const context = { sessions, menuItems: [], menuItemsLoaded: false };
   state.dayCache.set(date, context);
   state.loadedSessionRanges.add(`${date}|${date}`);
   state.dayContext = context;
   if (render) renderDashboard();
+  void hydrateDayMenuItems(date, sessions);
   return context;
+}
+
+async function hydrateDayMenuItems(date, sessions) {
+  const context = state.dayCache.get(date);
+  if (!context || context.menuItemsLoaded) return;
+  const sessionIds = sessions.map(item => item.sessionId).filter(Boolean).slice(0, 5);
+  context.menuItemsLoaded = true;
+  if (!sessionIds.length) return;
+  try {
+    const results = await Promise.all(sessionIds.map(sessionId =>
+      records("menuItems", { sessionId }, "orderNo", "ASC", 50)
+    ));
+    context.menuItems = results
+      .flatMap(result => result.records || [])
+      .sort((a, b) => Number(a.orderNo || 0) - Number(b.orderNo || 0));
+    state.dayCache.set(date, context);
+    if (state.viewMode === "day" && state.selectedDate === date) {
+      state.dayContext = context;
+      renderDashboard();
+    }
+  } catch (error) {
+    context.menuItemsLoaded = false;
+    console.warn("menu item intensity load failed", error);
+  }
 }
 
 async function loadCompetitionData() {
@@ -302,19 +329,34 @@ function renderDayMenuSections(context, sessions) {
   const block = element("section", "day-menu-section");
   const blockHead = element("div", "day-menu-section__head");
   blockHead.append(
-    element("span", "day-menu-section__dot", ""),
     element("strong", "", "実行する順番"),
     element("span", "day-menu-section__count", `${entries.length}項目`)
   );
 
   const list = element("ul", "day-menu-section__list");
   entries.forEach((item, index) => {
+    const score = Number.isFinite(item.intensityScore) ? item.intensityScore : null;
     const row = element("li", "day-menu-row");
+    row.dataset.intensityBand = intensityBand(score);
+    row.title = score === null
+      ? "個別強度は未設定です"
+      : `${item.intensityEstimated ? "表示用推定強度" : "強度"} ${score}/10`;
+
     const copy = element("div", "day-menu-row__copy");
-    copy.append(element("strong", "", `${index + 1}. ${item.title}`));
+    const titleLine = element("div", "day-menu-row__title");
+    titleLine.append(
+      element("span", "day-menu-row__index", String(index + 1)),
+      element("strong", "", item.title)
+    );
+    copy.append(titleLine);
     if (item.detail) copy.append(element("span", "", item.detail));
-    row.append(copy);
-    if (item.dose) row.append(element("span", "day-menu-row__dose", item.dose));
+
+    const meta = element("div", "day-menu-row__meta");
+    if (score !== null) {
+      meta.append(element("span", "day-menu-row__intensity", `${item.intensityEstimated ? "~" : ""}${score}/10`));
+    }
+    if (item.dose) meta.append(element("span", "day-menu-row__dose", item.dose));
+    row.append(copy, meta);
     list.append(row);
   });
   block.append(blockHead, list);
@@ -391,25 +433,88 @@ function dayMenuEntries(context, sessions) {
       const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
       const detail = item.cue || item.purpose || "";
       const searchable = [title, detail, item.category, item.block, item.section].filter(Boolean).join(" ");
-      return { title, detail, dose: doseText(item), section: inferDayMenuSection(searchable) };
+      return {
+        title,
+        detail,
+        dose: doseText(item),
+        section: inferDayMenuSection(searchable),
+        intensityScore: itemIntensityScore(item.intensity),
+        intensityEstimated: false,
+        exerciseId: item.exerciseId || item.sourceExerciseId || null
+      };
     });
   }
 
   const bridgeEntries = sessions.flatMap(session => compactBridgeItems(session.bridge)
-    .map(value => ({
-      title: value,
-      detail: "",
-      dose: "",
-      section: inferDayMenuSection(value)
-    })));
+    .map(value => {
+      const estimated = bridgeIntensityEstimate(value, session);
+      return {
+        title: value,
+        detail: "",
+        dose: "",
+        section: inferDayMenuSection(value),
+        intensityScore: estimated,
+        intensityEstimated: estimated !== null,
+        exerciseId: null
+      };
+    }));
   if (bridgeEntries.length) return bridgeEntries;
 
   return sessions.map(session => ({
     title: session.title || session.role || "セッション",
     detail: session.purpose || "",
     dose: sessionDoseText(session),
-    section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" "))
+    section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" ")),
+    intensityScore: sessionIntensity(session),
+    intensityEstimated: false,
+    exerciseId: null
   }));
+}
+
+function intensityBand(score) {
+  if (!Number.isFinite(score)) return "unset";
+  if (score <= 3) return "low";
+  if (score <= 7) return "medium";
+  return "high";
+}
+
+function itemIntensityScore(value) {
+  const raw = String(value || "").trim().toUpperCase().replace(/[・〜~_\s]/g, "-");
+  if (!raw) return null;
+  const tenScale = raw.match(/(?:^|[^0-9])(10|[1-9])\s*\/\s*10(?:$|[^0-9])/);
+  if (tenScale) return Math.max(1, Math.min(10, Number(tenScale[1])));
+  if (raw.includes("REST") || raw.includes("RECOVERY")) return 1;
+  if (raw.includes("MAX") || raw.includes("COMPETITION")) return 10;
+  if (raw.includes("VERY-HIGH")) return 9;
+  if (raw.includes("HIGH") && (raw.includes("MEDIUM") || raw.includes("MIDDLE"))) return 8;
+  if (raw.includes("HIGH")) return 8;
+  if (raw.includes("LOW") && (raw.includes("MEDIUM") || raw.includes("MIDDLE"))) return 4;
+  if (raw.includes("MEDIUM") || raw.includes("MIDDLE")) return 6;
+  if (raw.includes("LOW")) return 3;
+  return null;
+}
+
+function bridgeIntensityEstimate(value, session) {
+  const text = String(value || "");
+  const percentages = [...text.matchAll(/(\d{2,3})(?:\s*[〜~\-]\s*(\d{2,3}))?\s*%/g)]
+    .flatMap(match => [Number(match[1]), Number(match[2] || match[1])])
+    .filter(Number.isFinite);
+  if (percentages.length) {
+    const peak = Math.max(...percentages);
+    if (peak >= 100) return 10;
+    if (peak >= 95) return 9;
+    if (peak >= 90) return 8;
+    if (peak >= 80) return 7;
+    if (peak >= 70) return 6;
+    return 3;
+  }
+  const section = inferDayMenuSection(text);
+  if (section === "warmup") return 2;
+  if (section === "cooldown") return 1;
+  if (section === "primer") return 5;
+  if (section === "supplemental") return 5;
+  if (section === "sprint" || section === "main") return Math.max(8, sessionIntensity(session) || 8);
+  return null;
 }
 
 function inferDayMenuSection(value) {
@@ -943,24 +1048,96 @@ function renderExercises() {
     if (!entries.length) list.append(empty("該当する種目はありません。別のキーワードを試してください。"));
     entries.forEach(entry => {
       const exercise = entry.exercise || entry;
-      const body = [
-        exercise.mainPurpose,
-        exercise.initialPrescription,
-        exercise.rest ? `休息 ${exercise.rest}` : ""
-      ].filter(Boolean).join(" / ");
-      const card = recordCard(
-        exercise.yukiName || exercise.generalName || exercise.exerciseId,
-        exercise.category || "EXERCISE",
-        body
-      );
-      if (entry.matchedFields?.length) {
-        card.append(element("p", "exercise-match", `一致: ${entry.matchedFields.join("・")}`));
-      }
-      list.append(card);
+      list.append(exerciseLibraryCard(exercise, entry.matchedFields || []));
     });
   }
   panel.append(list);
   return panel;
+}
+
+function exerciseLibraryCard(exercise, matchedFields = []) {
+  const card = element("button", "record-card exercise-card");
+  card.type = "button";
+  const top = element("div", "record-card__top");
+  top.append(
+    element("h3", "", exercise.yukiName || exercise.generalName || exercise.exerciseId || "種目"),
+    pill(exercise.category || "EXERCISE", true)
+  );
+  card.append(top);
+  const body = [
+    exercise.mainPurpose,
+    exercise.initialPrescription,
+    exercise.rest ? `休息 ${exercise.rest}` : ""
+  ].filter(Boolean).join(" / ");
+  if (body) card.append(element("p", "", body));
+  if (matchedFields.length) card.append(element("p", "exercise-match", `一致: ${matchedFields.join("・")}`));
+  card.append(element("span", "exercise-card__open", "詳細を見る →"));
+  card.addEventListener("click", () => openExerciseDetail(exercise.exerciseId).catch(showFatalError));
+  return card;
+}
+
+async function openExerciseDetail(exerciseId) {
+  if (!exerciseId) return;
+  let exercise = state.exerciseDetailCache.get(exerciseId);
+  if (!exercise) {
+    state.exerciseDetailLoadingId = exerciseId;
+    setConnection("idle", "種目詳細取得中");
+    try {
+      const result = await api("getRecord", { entity: "exercises", key: exerciseId });
+      exercise = result.record || null;
+      if (!exercise) throw new Error("種目マスターの詳細を取得できませんでした。");
+      state.exerciseDetailCache.set(exerciseId, exercise);
+    } finally {
+      state.exerciseDetailLoadingId = "";
+      setConnection("ready", "最新データ");
+    }
+  }
+  showExerciseDetailDialog(exercise);
+}
+
+function showExerciseDetailDialog(exercise) {
+  const dialog = element("dialog", "exercise-dialog");
+  const card = element("div", "exercise-dialog__card");
+  const top = element("div", "exercise-dialog__top");
+  const heading = element("div");
+  heading.append(
+    element("span", "eyebrow eyebrow--cyan", exercise.category || "EXERCISE MASTER"),
+    element("h2", "", exercise.yukiName || exercise.generalName || exercise.exerciseId || "種目詳細")
+  );
+  const close = element("button", "icon-button", "×");
+  close.type = "button";
+  close.setAttribute("aria-label", "閉じる");
+  close.addEventListener("click", () => dialog.close());
+  top.append(heading, close);
+
+  const summary = element("div", "exercise-detail-summary");
+  summary.append(
+    metaItem("強度", exercise.intensity || "未登録"),
+    metaItem("標準設定", exercise.initialPrescription || "未登録"),
+    metaItem("休息", exercise.rest || "未登録")
+  );
+  card.append(top, summary);
+  appendExerciseDetail(card, "目的", exercise.mainPurpose);
+  appendExerciseDetail(card, "やり方・手順", exercise.instructions);
+  appendExerciseDetail(card, "意識するポイント", exercise.cue);
+  appendExerciseDetail(card, "成功の感覚", exercise.successFeeling);
+  appendExerciseDetail(card, "対象能力", exercise.targetAbility);
+  appendExerciseDetail(card, "避けること", exercise.avoid);
+  appendExerciseDetail(card, "終了基準", exercise.stopCondition);
+  appendExerciseDetail(card, "三段跳への接続", exercise.bridge);
+  appendExerciseDetail(card, "器具", exercise.equipment);
+
+  dialog.append(card);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove());
+  dialog.showModal();
+}
+
+function appendExerciseDetail(parent, label, value) {
+  if (!String(value || "").trim()) return;
+  const section = element("section", "exercise-detail-section");
+  section.append(element("h3", "", label), element("p", "", value));
+  parent.append(section);
 }
 
 function renderMeasurements() {
