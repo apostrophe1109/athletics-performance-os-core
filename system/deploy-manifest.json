@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_a1e112da99c24e519f340d671e091136",
-  "generatedAt": "2026-08-17T07:22:03.118Z",
-  "baseCommitSha": "63922e034e7bbafdd4220ad785a14bca9c48cc0d",
-  "changeReason": "承認済みMaintenance Previewとして、通常のApps Script本番デプロイ経路から診断用一時デプロイ処理を分離する。",
+  "deploymentId": "SITEDEPLOY_9e86c75679a74683ba5eecd12be17051",
+  "generatedAt": "2026-08-17T07:29:09.427Z",
+  "baseCommitSha": "422c3fcfcbb1e88fe8b7d22d6183838ab36299ea",
+  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、Apps Scriptデプロイworkflowの1ファイルだけをPATCH_TEXTで安全に修正可能にする。",
   "files": [
     {
-      "path": "system/deploy_apps_script.py",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "fe7041aabbb44609121bcff744b3e6f1a5764427ef49b9b4f2da1a2701b5b737"
+      "contentHash": "b896194f49e13457116bca1bc85bb2234357e061c4910146d9ad06ff085a2545"
     }
   ]
 }

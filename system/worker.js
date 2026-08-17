@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.12
+ * Version: 1.4.13
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.12";
+const VERSION = "1.4.13";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1315,6 +1315,7 @@ function base64Utf8Decode(value) {
 }
 
 const MAINTENANCE_SOURCE_ROOT_DEFAULT = "system";
+const MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST = new Set([".github/workflows/apos-deploy-apps-script.yml"]);
 const MAINTENANCE_READ_OPERATIONS = new Set(["SYSTEM_TREE", "SYSTEM_FILE", "RUNTIME_POLICY", "DEPLOYMENT_STATUS", "DEPLOYMENT_DIAGNOSTIC", "BACKEND_DIAGNOSTIC"]);
 const MAINTENANCE_PREVIEW_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
 const MAINTENANCE_APPLY_OPERATIONS = new Set(["SYSTEM_SOURCE_CHANGE", "SYSTEM_SOURCE_ROLLBACK"]);
@@ -1327,6 +1328,21 @@ function maintenanceEnv(env) {
   return new Proxy(env, {
     get(target, prop) {
       if (prop === "APOS_SITE_SOURCE_ROOT") return maintenanceSourceRoot(target);
+      return target[prop];
+    }
+  });
+}
+
+function maintenanceChangeEnv(payload, env) {
+  const changes = Array.isArray(payload?.changes) ? payload.changes : [];
+  const workflowPatchOnly = changes.length > 0 && changes.every(change =>
+    MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST.has(String(change?.path || ""))
+    && String(change?.mode || "") === "PATCH_TEXT"
+  );
+  if (!workflowPatchOnly) return maintenanceEnv(env);
+  return new Proxy(env, {
+    get(target, prop) {
+      if (prop === "APOS_SITE_SOURCE_ROOT") return ".github/workflows";
       return target[prop];
     }
   });
@@ -1352,6 +1368,7 @@ async function getMaintenanceCapabilities(env) {
       fileHashRaceProtection: true,
       destructiveSourceDeleteRequires: "SOURCE_DELETE_APPROVED",
       sourceRootRestricted: true,
+      deploymentWorkflowPatchAllowlist: Array.from(MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST),
       writeAutoRetry: false,
     },
     deploymentWorkflows: {
@@ -1571,7 +1588,7 @@ async function maintenancePreview(body, auth, env) {
     throw Object.assign(new Error("maintenancePreviewのoperationが未対応です。getMaintenanceCapabilitiesで確認してください。"), { code: "MAINTENANCE_OPERATION_UNSUPPORTED", status: 400 });
   }
   const payload = isPlainObject(body.payload) ? body.payload : {};
-  const scopedEnv = maintenanceEnv(env);
+  const scopedEnv = maintenanceChangeEnv(payload, env);
   if (operation === "SYSTEM_SOURCE_CHANGE") {
     const result = await previewSiteSourceChange(payload, auth, scopedEnv);
     return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM", writePerformed: false };
@@ -1724,7 +1741,7 @@ async function maintenanceApply(body, auth, env) {
     throw Object.assign(new Error("maintenanceApplyのoperationが未対応です。getMaintenanceCapabilitiesで確認してください。"), { code: "MAINTENANCE_OPERATION_UNSUPPORTED", status: 400 });
   }
   const payload = isPlainObject(body.payload) ? body.payload : {};
-  const scopedEnv = maintenanceEnv(env);
+  const scopedEnv = maintenanceChangeEnv(payload, env);
   let result;
   if (operation === "SYSTEM_SOURCE_CHANGE") result = await applySiteSourceChange(payload, auth, scopedEnv);
   else result = await applySiteSourceRollback(payload, auth, scopedEnv);
