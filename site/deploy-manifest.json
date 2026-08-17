@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_b8b4e71ecbe7466889280090cc80aea8",
-  "generatedAt": "2026-08-17T06:11:10.420Z",
-  "baseCommitSha": "f833772acee57bf2a04c0d163e13e9e5bdf648c0",
-  "changeReason": "承認済みの日別メニュー詳細強化、設定タイム表示、滑らかなアニメーション、軽量化方針を反映する。",
+  "deploymentId": "SITEDEPLOY_cd3ea2bbaa5f4e26ba34f9dfd4ad12ae",
+  "generatedAt": "2026-08-17T06:55:22.728Z",
+  "baseCommitSha": "4b64d405ad455d8bb2b099694f489cf33b02207d",
+  "changeReason": "承認済みの音声入力・練習記録構造化要約機能をAPOS Viewへ反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "19129149d3b5bca12eed3a83b85472aad21c4dbdeee1acc8fb67bdc594ea06d4"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "8dc59275c10086c8080f5955f683e5c42a167d7b574d7ddb80ed0ec3929f344c"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "5a01bf5ceb4f4f2d04a247a3d496c4ed52211532d3ecb3471f10f55b17880d4d"
+      "contentHash": "955dc675c1eb1c7d47b0e4b067569512dd86b9d2fef4225818d8cbb854c6f849"
     }
   ]
 }

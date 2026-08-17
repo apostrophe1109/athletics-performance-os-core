@@ -963,7 +963,7 @@ function openRecordDialog(mode) {
   const transcript = element("textarea", "record-textarea");
   transcript.rows = 9;
   transcript.placeholder = mode === "voice"
-    ? "ここに文字起こしが入ります。必要なら手で修正できます。"
+    ? "話し言葉のままでOK。種目、本数・距離・タイム・重量、良かった点、課題、痛み・張りなどを話すと、練習記録として整理します。"
     : "例：ウォームアップはジョグ20分。バウンディング20mを2本。助走は良かったが、後半は少し脚が重かった。";
   transcript.setAttribute("aria-label", "実施内容");
 
@@ -1019,7 +1019,7 @@ function openRecordDialog(mode) {
     voiceTools.append(mic, micLabel, voiceStatus);
   }
 
-  const organize = element("button", "organize-button", "内容を整理する");
+  const organize = element("button", "organize-button", "練習記録に整理する");
   organize.type = "button";
   const preview = element("div", "draft-preview");
   preview.hidden = true;
@@ -1034,15 +1034,21 @@ function openRecordDialog(mode) {
       systemNote.textContent = "実施内容を入力してください。";
       return;
     }
-    const draft = summarizeLocally(value);
+    const draft = summarizeTrainingRecord(value);
+    const sections = [
+      ["実施内容", draft.actions],
+      ["数値・結果", draft.records],
+      ["良かった点", draft.positives],
+      ["課題・改善点", draft.issues],
+      ["身体反応・コンディション", draft.condition]
+    ].filter(([, items]) => items.length);
     preview.replaceChildren(
       element("span", "eyebrow", "SAVE PREVIEW"),
-      element("h4", "", "保存前の確認"),
-      draftList("実施内容", draft.actions),
-      draftList("良かった点・気づき", draft.notes)
+      element("h4", "", "練習記録として整理した内容"),
+      ...sections.map(([title, items]) => draftList(title, items))
     );
     preview.hidden = false;
-    systemNote.textContent = "この画面ではまだ保存されません。内容を確認・修正してください。";
+    systemNote.textContent = "話し言葉から事実だけを整理しています。原文にない内容は補いません。保存前に必ず確認してください。";
     save.disabled = false;
   });
 
@@ -1062,18 +1068,95 @@ function openRecordDialog(mode) {
   dialog.showModal();
 }
 
-function summarizeLocally(text) {
-  const chunks = text
-    .split(/[。！？\n]+/)
+function summarizeTrainingRecord(text) {
+  const chunks = segmentTrainingSpeech(text);
+  const actions = [];
+  const records = [];
+  const positives = [];
+  const issues = [];
+  const condition = [];
+
+  const positiveWords = /良かった|良い|よかった|できた|成功|安定|スムーズ|軽かった|速かった|余裕|狙いどおり|狙い通り|感覚が良/;
+  const issueWords = /課題|難しかった|できなかった|失敗|崩れ|崩れた|悪かった|合わなかった|遅かった|ばらつ|バラつ|詰まった|不足|改善|気になった/;
+  const conditionWords = /痛|張り|違和感|疲労|疲れ|重かった|重い|だる|硬い|攣|つり|腫れ|脚|足首|膝|腰|ハム|ふくらはぎ|アキレス|体調/;
+  const actionWords = /実施|やった|行った|走った|跳んだ|投げた|上げた|挙げた|ウォーム|ジョグ|流し|スプリント|ダッシュ|助走|踏切|跳躍|バウンディング|ポゴ|ドリル|スクワット|クリーン|デッドリフト|プレス|補強|ストレッチ|モビリティ|セット|本|回|kg|キロ|秒|分|cm|mm|m\b|％|%/i;
+
+  chunks.forEach(chunk => {
+    const value = normalizeSpokenTrainingText(chunk);
+    if (!value) return;
+
+    const isCondition = conditionWords.test(value);
+    const isPositive = positiveWords.test(value);
+    const isIssue = issueWords.test(value);
+    const isAction = actionWords.test(value) || hasTrainingMetric(value);
+    const record = extractTrainingRecord(value);
+
+    if (isAction) pushUnique(actions, value, 10);
+    if (record) pushUnique(records, record, 10);
+    if (isPositive) pushUnique(positives, value, 6);
+    if (isIssue) pushUnique(issues, value, 6);
+    if (isCondition) pushUnique(condition, value, 6);
+
+    if (!isAction && !isPositive && !isIssue && !isCondition) {
+      pushUnique(issues, value, 6);
+    }
+  });
+
+  if (!actions.length && chunks.length) {
+    chunks.slice(0, 8).forEach(chunk => pushUnique(actions, normalizeSpokenTrainingText(chunk), 8));
+  }
+
+  return { actions, records, positives, issues, condition };
+}
+
+function segmentTrainingSpeech(text) {
+  return String(text || "")
+    .replace(/\r/g, "\n")
+    .replace(/[！？!?]+/g, "。")
+    .replace(/\n+/g, "。")
+    .replace(/(?:^|。)\s*(?:それで|そのあと|あと|次に|最後に)[、,\s]*/g, "。")
+    .split(/。+/)
     .map(value => value.trim())
     .filter(Boolean);
-  const noteWords = /良|痛|重|軽|疲|違和感|感覚|調子|でき|難|安定|課題|気づ/;
-  const actions = chunks.filter(value => !noteWords.test(value)).slice(0, 8);
-  const notes = chunks.filter(value => noteWords.test(value)).slice(0, 6);
-  return {
-    actions: actions.length ? actions : chunks.slice(0, 8),
-    notes: notes.length ? notes : ["必要に応じて追記してください。"]
-  };
+}
+
+function normalizeSpokenTrainingText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^(?:えーと|えっと|あの|その|なんか|まあ|えー|うーん)[、,\s]*/g, "")
+    .replace(/^(?:で|それで|あと|次に|最後に)[、,\s]+/g, "")
+    .replace(/[、,]\s*(?:えーと|えっと|あの|なんか|まあ)[、,\s]*/g, "、")
+    .replace(/(?:っていう感じ|という感じ|みたいな感じ)(?:です|でした)?$/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[、,\s]+|[、,\s]+$/g, "")
+    .trim();
+}
+
+function hasTrainingMetric(value) {
+  return /\d+(?:\.\d+)?\s*(?:kg|キロ|km|m|cm|mm|秒|分|時間|本|回|セット|set|sets|rep|reps|％|%)/i.test(String(value || ""));
+}
+
+function extractTrainingRecord(value) {
+  const source = String(value || "");
+  const metricPattern = /\d+(?:\.\d+)?(?:\s*[〜~\-]\s*\d+(?:\.\d+)?)?\s*(?:kg|キロ|km|m|cm|mm|秒|分|時間|本|回|セット|set|sets|rep|reps|％|%)/gi;
+  const matches = [...source.matchAll(metricPattern)];
+  if (!matches.length) {
+    return /タイム|記録|ベスト|成功|失敗|クリア|RPE/i.test(source) ? source : "";
+  }
+  const metrics = [...new Set(matches.map(match => match[0].replace(/\s+/g, "")))];
+  const first = matches[0];
+  const prefix = source
+    .slice(0, first.index)
+    .replace(/[はをでがの：:\s、,]+$/g, "")
+    .trim();
+  const label = prefix && prefix.length <= 28 ? prefix : "";
+  return `${label ? `${label}：` : ""}${metrics.join(" / ")}`;
+}
+
+function pushUnique(list, value, limit) {
+  const normalized = String(value || "").trim();
+  if (!normalized || list.includes(normalized) || list.length >= limit) return;
+  list.push(normalized);
 }
 
 function draftList(title, items) {
