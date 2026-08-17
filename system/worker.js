@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.19
+ * Version: 1.4.20
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.19";
+const VERSION = "1.4.20";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1589,6 +1589,7 @@ async function maintenanceRead(body, auth, env) {
       path: payload.path,
       offset: payload.offset || 0,
       limit: payload.limit || SITE_SOURCE_CHUNK_MAX,
+      commitSha: payload.commitSha || null,
     }, scopedEnv);
     return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM" };
   }
