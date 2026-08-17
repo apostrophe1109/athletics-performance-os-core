@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9c0ed65ef39a4dc9ba869a40efe24f97",
-  "generatedAt": "2026-08-17T07:09:04.820Z",
-  "baseCommitSha": "5f0a0c18a775ec82794d182a0988727ccfb05d2b",
-  "changeReason": "承認済みMaintenance Previewとして、Apps Scriptデプロイツールの診断用無条件RuntimeErrorを通常デプロイ時に発生させないよう修正する。",
+  "deploymentId": "SITEDEPLOY_a1e112da99c24e519f340d671e091136",
+  "generatedAt": "2026-08-17T07:22:03.118Z",
+  "baseCommitSha": "63922e034e7bbafdd4220ad785a14bca9c48cc0d",
+  "changeReason": "承認済みMaintenance Previewとして、通常のApps Script本番デプロイ経路から診断用一時デプロイ処理を分離する。",
   "files": [
     {
       "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "bcb58ecef207a5a0d0f554916ff3ad8ec1ccaef33c53869aaf34cfb16238d5a5"
+      "contentHash": "fe7041aabbb44609121bcff744b3e6f1a5764427ef49b9b4f2da1a2701b5b737"
     }
   ]
 }

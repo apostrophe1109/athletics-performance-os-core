@@ -221,99 +221,12 @@ def main():
             time.sleep(2)
         raise RuntimeError("Diagnostic deployment version read-back did not converge")
 
-    probe_results = {}
-    new_deployment_id = None
-    restore_error = None
-    original_files = json.loads(json.dumps(files))
-    probe_files = json.loads(json.dumps(files))
-    probe_target = next((item for item in probe_files if item.get("name") == code_file_name and item.get("type") == "SERVER_JS"), None)
-    if probe_target is None:
-        raise RuntimeError("New deployment diagnostic target SERVER_JS was not found")
-    probe_target["source"] = probe_source
-    try:
-        http_json(
-            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
-            method="PUT",
-            body={"files": probe_files},
-            token=token,
-        )
-        probe_version = http_json(
-            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/versions",
-            method="POST",
-            body={"description": "APOS fresh deployment backend diagnostic"},
-            token=token,
-        )
-        probe_version_number = probe_version.get("versionNumber")
-        if not isinstance(probe_version_number, int):
-            raise RuntimeError("Fresh deployment diagnostic versionNumber missing")
-        current_deployment = http_json(
-            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments/{urllib.parse.quote(deployment_id)}",
-            token=token,
-        )
-        manifest_name = (current_deployment.get("deploymentConfig") or {}).get("manifestFileName")
-        if not manifest_name:
-            raise RuntimeError("Fresh deployment diagnostic manifestFileName missing")
-        created = http_json(
-            f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/deployments",
-            method="POST",
-            body={
-                "scriptId": script_id,
-                "versionNumber": probe_version_number,
-                "manifestFileName": manifest_name,
-                "description": "APOS fresh deployment backend diagnostic",
-            },
-            token=token,
-        )
-        new_deployment_id = str(created.get("deploymentId") or "").strip() or None
-        if not new_deployment_id:
-            raise RuntimeError("Fresh deployment diagnostic deploymentId missing")
-        time.sleep(3)
-        probe_url = (
-            f"https://script.google.com/macros/s/{urllib.parse.quote(new_deployment_id)}/exec"
-            f"?action=__backendProbe&mode=openfile"
-        )
-        started = time.time()
-        try:
-            with urllib.request.urlopen(probe_url, timeout=20) as response:
-                raw = response.read().decode("utf-8")
-                payload = json.loads(raw) if raw else {}
-                probe_results["freshDeploymentOpen"] = {
-                    "httpStatus": response.status,
-                    "success": payload.get("success"),
-                    "status": payload.get("status"),
-                    "elapsedSeconds": round(time.time() - started, 2),
-                }
-        except Exception as exc:
-            probe_results["freshDeploymentOpen"] = {
-                "success": False,
-                "status": "PROBE_TIMEOUT_OR_FETCH_ERROR",
-                "errorType": type(exc).__name__,
-                "elapsedSeconds": round(time.time() - started, 2),
-            }
-    finally:
-        try:
-            http_json(
-                f"{SCRIPT_API}/projects/{urllib.parse.quote(script_id)}/content",
-                method="PUT",
-                body={"files": original_files},
-                token=token,
-            )
-        except Exception as exc:
-            restore_error = str(exc)
-
-    deployment_parts = []
-    if new_deployment_id:
-        deployment_parts = [new_deployment_id[i:i+24] for i in range(0, len(new_deployment_id), 24)]
-    safe_diag = {
-        "newDeploymentCreated": bool(new_deployment_id),
-        "deploymentIdParts": deployment_parts,
-        "probeResults": probe_results,
-        "projectContentRestored": restore_error is None,
-    }
-    if restore_error:
-        safe_diag["restoreError"] = restore_error
+    # Fresh diagnostic deployments are intentionally excluded from the normal
+    # approved deployment path. They create extra versions/deployments and can
+    # fail independently of the production update. Keep production deployment
+    # deterministic: update content -> create version -> update existing deploy -> verify.
     if os.environ.get("APOS_RUN_FRESH_DEPLOY_DIAG", "").strip() == "1":
-        raise RuntimeError("APOS_FRESH_DEPLOY_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
+        raise RuntimeError("APOS_FRESH_DEPLOY_DIAG must be run outside the production deployment path")
 
     target = None
     for f in files:
