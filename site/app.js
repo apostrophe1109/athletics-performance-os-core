@@ -338,9 +338,7 @@ function renderDayMenuSections(context, sessions) {
     const score = Number.isFinite(item.intensityScore) ? item.intensityScore : null;
     const row = element("li", "day-menu-row");
     row.dataset.intensityBand = intensityBand(score);
-    row.title = score === null
-      ? "個別強度は未設定です"
-      : `${item.intensityEstimated ? "表示用推定強度" : "強度"} ${score}/10`;
+    row.title = `強度 ${score}/10`;
 
     const copy = element("div", "day-menu-row__copy");
     const titleLine = element("div", "day-menu-row__title");
@@ -353,7 +351,7 @@ function renderDayMenuSections(context, sessions) {
 
     const meta = element("div", "day-menu-row__meta");
     if (score !== null) {
-      meta.append(element("span", "day-menu-row__intensity", `${item.intensityEstimated ? "~" : ""}${score}/10`));
+      meta.append(element("span", "day-menu-row__intensity", `${score}/10`));
     }
     if (item.dose) meta.append(element("span", "day-menu-row__dose", item.dose));
     row.append(copy, meta);
@@ -438,7 +436,11 @@ function dayMenuEntries(context, sessions) {
         detail,
         dose: doseText(item),
         section: inferDayMenuSection(searchable),
-        intensityScore: itemIntensityScore(item.intensity),
+        intensityScore: resolvedTrainingIntensity(
+          searchable,
+          sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null,
+          item.intensity
+        ),
         intensityEstimated: false,
         exerciseId: item.exerciseId || item.sourceExerciseId || null
       };
@@ -454,7 +456,7 @@ function dayMenuEntries(context, sessions) {
         dose: "",
         section: inferDayMenuSection(value),
         intensityScore: estimated,
-        intensityEstimated: estimated !== null,
+        intensityEstimated: false,
         exerciseId: null
       };
     }));
@@ -472,10 +474,16 @@ function dayMenuEntries(context, sessions) {
 }
 
 function intensityBand(score) {
-  if (!Number.isFinite(score)) return "unset";
+  if (!Number.isFinite(score)) return "medium";
   if (score <= 3) return "low";
   if (score <= 7) return "medium";
   return "high";
+}
+
+function resolvedTrainingIntensity(text, session, explicitValue = "") {
+  const explicit = itemIntensityScore(explicitValue);
+  if (explicit !== null) return explicit;
+  return judgeTrainingIntensity(text, session);
 }
 
 function itemIntensityScore(value) {
@@ -495,7 +503,12 @@ function itemIntensityScore(value) {
 }
 
 function bridgeIntensityEstimate(value, session) {
+  return judgeTrainingIntensity(value, session);
+}
+
+function judgeTrainingIntensity(value, session) {
   const text = String(value || "");
+  const normalized = text.toLowerCase();
   const percentages = [...text.matchAll(/(\d{2,3})(?:\s*[〜~\-]\s*(\d{2,3}))?\s*%/g)]
     .flatMap(match => [Number(match[1]), Number(match[2] || match[1])])
     .filter(Number.isFinite);
@@ -506,15 +519,28 @@ function bridgeIntensityEstimate(value, session) {
     if (peak >= 90) return 8;
     if (peak >= 80) return 7;
     if (peak >= 70) return 6;
+    if (peak >= 60) return 5;
     return 3;
   }
-  const section = inferDayMenuSection(text);
-  if (section === "warmup") return 2;
-  if (section === "cooldown") return 1;
-  if (section === "primer") return 5;
-  if (section === "supplemental") return 5;
-  if (section === "sprint" || section === "main") return Math.max(8, sessionIntensity(session) || 8);
-  return null;
+
+  if (/休息|rest|完全休養|完全休息/.test(normalized)) return 1;
+  if (/クール|整理運動|静的ストレッチ|呼吸/.test(normalized)) return 1;
+  if (/ウォーム|動的モビリティ|モビリティ|可動域|aマーチ|マーチ/.test(normalized)) return 2;
+  if (/aスキップ|スキップ|低振幅ポゴ|ポゴ|ロープフロー|ドリル/.test(normalized)) return 3;
+  if (/デッドバグ|ヒラメ筋|soleus|アイソ|プランク|ヒップリフト|補強|体幹/.test(normalized)) return 4;
+  if (/メディシン|medicine|\bmb\b|直上投げ|後方投げ/.test(normalized)) return 5;
+  if (/ビルドアップ|流し|神経プライマー|primer/.test(normalized)) return 6;
+  if (/ランスルー|助走通過|踏切通過|助走チェック/.test(normalized)) return 7;
+  if (/全助走.*(?:tj|トリプル|三段跳)|(?:tj|トリプル|三段跳).*全助走|competition|本番/.test(normalized)) return 10;
+  if (/バウンディング|ホップ|ステップ|ジャンプ|跳躍|踏切/.test(normalized)) return 8;
+  if (/ダッシュ|全力走|max-v|スプリント|tempo|テンポ|\(\s*\d{2,3}m\s*\+|\d{2,3}m/.test(normalized)) {
+    return Math.max(8, sessionIntensity(session) || 8);
+  }
+  if (/スクワット|deadlift|デッドリフト|rdl|split squat|スプリットスクワット|ハイクリーン|クリーン|ベンチ|プレス|筋力|strength/.test(normalized)) {
+    return Math.max(6, Math.min(8, sessionIntensity(session) || 6));
+  }
+
+  return sessionIntensity(session) || 5;
 }
 
 function inferDayMenuSection(value) {
@@ -1232,6 +1258,7 @@ function measurementLabel(type) {
 
 function intensityCard(score) {
   const box = element("div", "intensity-card");
+  box.dataset.intensityBand = intensityBand(score);
   box.append(
     element("span", "intensity-card__label", "練習強度"),
     element("strong", "", score === null ? "— / 10" : `${score} / 10`)
@@ -1245,7 +1272,9 @@ function intensityCard(score) {
 }
 
 function intensityMini(score) {
-  return element("span", "intensity-mini", score === null ? "—/10" : `${score}/10`);
+  const mini = element("span", "intensity-mini", score === null ? "—/10" : `${score}/10`);
+  if (score !== null) mini.dataset.intensityBand = intensityBand(score);
+  return mini;
 }
 
 function sessionIntensity(session) {
