@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.17
+ * Version: 1.4.18
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.17";
+const VERSION = "1.4.18";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1406,6 +1406,12 @@ async function getMaintenanceDeploymentDiagnostic(payload, env) {
     conclusion: job?.conclusion || null,
     startedAt: job?.started_at || null,
     completedAt: job?.completed_at || null,
+    steps: (Array.isArray(job?.steps) ? job.steps : []).map(step => ({
+      number: Number(step?.number || 0),
+      name: String(step?.name || ""),
+      status: String(step?.status || ""),
+      conclusion: step?.conclusion || null,
+    })),
   }));
   const failedJobs = jobs.filter(job => job.id > 0 && job.conclusion && job.conclusion !== "success");
   const failedJobLogs = [];
@@ -1417,7 +1423,17 @@ async function getMaintenanceDeploymentDiagnostic(payload, env) {
       if (!location) throw Object.assign(new Error("GitHub job log redirect先を取得できません。"), { code: "MAINTENANCE_JOB_LOG_REDIRECT_MISSING", status: 502 });
       response = await fetch(location, { headers: { accept: "text/plain" }, redirect: "follow" });
     }
-    if (!response.ok) throw Object.assign(new Error(`GitHub job log取得に失敗しました (${response.status})。`), { code: "MAINTENANCE_JOB_LOG_READ_FAILED", status: 502 });
+    if (!response.ok) {
+      failedJobLogs.push({
+        jobId: job.id,
+        name: job.name,
+        conclusion: job.conclusion,
+        logUnavailable: true,
+        httpStatus: response.status,
+        errorLines: "",
+      });
+      continue;
+    }
     const raw = await response.text();
     const errorLines = raw.split(/\r?\n/)
       .filter(line => /(traceback|runtimeerror|error|failed|http\s+\d|forbidden|permission|scope|invalid|mismatch|refusing|exception)/i.test(line))
