@@ -1,24 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_478ca867365541cfb68d6333cff48734",
-  "generatedAt": "2026-08-17T05:54:53.184Z",
-  "baseCommitSha": "5a49b3fd0ca0fc5d5abd82a54284a85c202c95cd",
-  "changeReason": "承認済みのFace ID自動認証改善、日別メニュー詳細アコーディオン、全ボタン押下フィードバックを反映する。",
+  "deploymentId": "SITEDEPLOY_b8b4e71ecbe7466889280090cc80aea8",
+  "generatedAt": "2026-08-17T06:11:10.420Z",
+  "baseCommitSha": "f833772acee57bf2a04c0d163e13e9e5bdf648c0",
+  "changeReason": "承認済みの日別メニュー詳細強化、設定タイム表示、滑らかなアニメーション、軽量化方針を反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "a2fa25f4215a73f6699f1af922e112760c1969a03ad3b8e9e07cfc923fe6142c"
+      "contentHash": "19129149d3b5bca12eed3a83b85472aad21c4dbdeee1acc8fb67bdc594ea06d4"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "df7f54503b8285532ce9e8da080b528fd140576846b71f4730b13b8c1bfc7706"
+      "contentHash": "8dc59275c10086c8080f5955f683e5c42a167d7b574d7ddb80ed0ec3929f344c"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "8ee9fdc265f762932cd0488d36894572a7b89fab4e76f114bb7101132ab2eeb0"
+      "contentHash": "5a01bf5ceb4f4f2d04a247a3d496c4ed52211532d3ecb3471f10f55b17880d4d"
     }
   ]
 }

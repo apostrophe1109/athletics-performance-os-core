@@ -37,6 +37,8 @@ const state = {
   exerciseDetailCache: new Map(),
   exerciseDetailLoadingId: "",
   openDayMenuDetails: new Set(),
+  sprintBaselineMeasurements: null,
+  sprintBaselineLoading: null,
   webSessionToken: sessionStorage.getItem("aposWebSession") || ""
 };
 state.selectedDate = state.today;
@@ -515,36 +517,52 @@ async function toggleDayMenuDetail(key, item, score, toggle, detail, detailInner
   state.openDayMenuDetails.add(key);
   toggle.setAttribute("aria-expanded", "true");
   detail.dataset.open = "true";
-  renderDayMenuDetail(detailInner, item, score, state.exerciseDetailCache.get(item.exerciseId) || null);
+  let exercise = state.exerciseDetailCache.get(item.exerciseId) || null;
+  let sprintBaselines = state.sprintBaselineMeasurements;
+  renderDayMenuDetail(detailInner, item, score, exercise, sprintBaselines);
 
-  if (!item.exerciseId || state.exerciseDetailCache.has(item.exerciseId)) return;
-  detailInner.append(element("p", "day-menu-detail__loading", "種目マスターの詳細を読み込み中…"));
-  try {
-    const result = await api("getRecord", { entity: "exercises", key: item.exerciseId });
-    const exercise = result.record || null;
-    if (exercise) state.exerciseDetailCache.set(item.exerciseId, exercise);
-    if (state.openDayMenuDetails.has(key)) renderDayMenuDetail(detailInner, item, score, exercise);
-  } catch (error) {
-    console.warn("day menu exercise detail load failed", error);
-    if (state.openDayMenuDetails.has(key)) {
-      renderDayMenuDetail(detailInner, item, score, null);
-      detailInner.append(element("p", "day-menu-detail__loading", "種目マスター詳細を取得できませんでした。基本ガイドを表示しています。"));
-    }
+  const tasks = [];
+  if (item.exerciseId && !exercise) {
+    tasks.push(
+      api("getRecord", { entity: "exercises", key: item.exerciseId })
+        .then(result => {
+          exercise = result.record || null;
+          if (exercise) state.exerciseDetailCache.set(item.exerciseId, exercise);
+        })
+        .catch(error => console.warn("day menu exercise detail load failed", error))
+    );
+  }
+  if (isTimedSprintItem(item)) {
+    tasks.push(
+      ensureSprintBaselines()
+        .then(records => { sprintBaselines = records; })
+        .catch(error => console.warn("sprint baseline load failed", error))
+    );
+  }
+
+  if (!tasks.length) return;
+  await Promise.all(tasks);
+  if (state.openDayMenuDetails.has(key)) {
+    renderDayMenuDetail(detailInner, item, score, exercise, sprintBaselines);
   }
 }
 
-function renderDayMenuDetail(container, item, score, exercise) {
+function renderDayMenuDetail(container, item, score, exercise, sprintBaselines = null) {
   container.replaceChildren();
   const facts = element("div", "day-menu-detail__facts");
   facts.append(
     dayMenuFact("強度", `${score}/10`),
-    dayMenuFact("設定", item.dose || exercise?.initialPrescription || "当日の指定どおり"),
+    dayMenuFact("設定", item.dose || exercise?.initialPrescription || sprintSettingSummary(item, score)),
     dayMenuFact("休息", exercise?.rest || dayMenuRestFromTitle(item.title) || "メニュー表記どおり")
   );
   container.append(facts);
 
+  if (isTimedSprintItem(item)) container.append(renderSprintTiming(item, score, sprintBaselines));
+
+  const steps = buildDayMenuSteps(item, exercise, score);
+  if (steps.length) appendDayMenuSteps(container, steps);
+
   appendDayMenuGuide(container, "狙い", exercise?.mainPurpose || dayMenuSectionPurpose(item.section));
-  appendDayMenuGuide(container, "やり方・手順", exercise?.instructions || dayMenuFallbackInstructions(item));
   appendDayMenuGuide(container, "意識するポイント", exercise?.cue || item.detail || dayMenuSectionCue(item.section));
   appendDayMenuGuide(container, "成功の感覚", exercise?.successFeeling);
   appendDayMenuGuide(container, "避けること", exercise?.avoid);
@@ -563,6 +581,196 @@ function appendDayMenuGuide(parent, label, value) {
   const section = element("section", "day-menu-detail__section");
   section.append(element("h4", "", label), element("p", "", value));
   parent.append(section);
+}
+
+function appendDayMenuSteps(parent, steps) {
+  const section = element("section", "day-menu-detail__section day-menu-detail__section--steps");
+  section.append(element("h4", "", "練習の手順"));
+  const list = element("ol", "day-menu-detail__steps");
+  steps.forEach(step => list.append(element("li", "", step)));
+  section.append(list);
+  parent.append(section);
+}
+
+function buildDayMenuSteps(item, exercise, score) {
+  const splitSteps = splitSprintProcedure(item, score);
+  if (splitSteps.length) return splitSteps;
+
+  const instructions = String(exercise?.instructions || "")
+    .split(/→|\n+|。+/)
+    .map(value => value.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  if (instructions.length >= 2) return instructions;
+
+  const steps = [];
+  if (isTimedSprintItem(item)) {
+    const target = sprintSettingSummary(item, score);
+    steps.push("開始前に走路・スタート位置・計時方法を確認し、当日の基準をそろえる。");
+    steps.push(`${item.title}を${target}で実施する。最初の1本は力みより姿勢と接地の質を優先する。`);
+    steps.push("本数間は次の反復で同じ走姿勢を再現できるまで回復し、タイムだけを追って休息を削らない。");
+  } else {
+    steps.push(dayMenuFallbackInstructions(item));
+    if (exercise?.cue || item.detail) steps.push(`主キューは「${exercise?.cue || item.detail}」。1反復で意識するポイントを増やし過ぎない。`);
+  }
+  return steps.filter(Boolean).slice(0, 8);
+}
+
+function splitSprintProcedure(item, score) {
+  const title = String(item.title || "");
+  if (!/^\(\s*\d{2,3}m(?:\s*\+\s*\d{2,3}m)+\s*\)×\d+set/i.test(title)) return [];
+  const bridgeParts = String(item.session?.bridge || "")
+    .split(/→|\n+/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  const distances = sprintDistances(title);
+  if (!distances.length) return [];
+  const startIndex = bridgeParts.findIndex(part => new RegExp(`^${distances[0]}m\\b`, "i").test(part));
+  if (startIndex < 0) return [dayMenuFallbackInstructions(item)];
+
+  const steps = [];
+  for (let i = startIndex; i < bridgeParts.length && steps.length < 8; i++) {
+    const part = bridgeParts[i];
+    const run = part.match(/^(\d{2,3})m\s*(\d{2,3})?(?:\s*[〜~\-]\s*(\d{2,3}))?\s*[%％]?/i);
+    if (run) {
+      const distance = Number(run[1]);
+      const band = targetPercentForDistance(item, score, distance);
+      steps.push(`${distance}m：MAX ${formatPercentBand(band)}を目安に走る。姿勢・接地・リズムを崩さず、区間終盤まで速度を運ぶ。`);
+      continue;
+    }
+    if (/^\d+(?:〜\d+)?秒(?:休息)?$/.test(part)) {
+      steps.push(`${part.replace(/休息$/, "")}休息。完全に落ち着き過ぎず、次の区間で速さを再構築できる状態に整える。`);
+      continue;
+    }
+    if (/^\d+(?:〜\d+)?分休息$/.test(part)) {
+      steps.push(`ここまでを1セットとして${part}。呼吸・脚の張り・接地感を整えてから次セットへ進む。`);
+      continue;
+    }
+    const repeat = part.match(/^同内容(\d+)セット目$/);
+    if (repeat) {
+      steps.push(`同じ内容を${repeat[1]}セット目まで実施する。1セット目より2〜3％以上低下したら追加しない。`);
+      break;
+    }
+    if (steps.length && !/^\d/.test(part)) break;
+  }
+  return steps;
+}
+
+async function ensureSprintBaselines() {
+  if (Array.isArray(state.sprintBaselineMeasurements)) return state.sprintBaselineMeasurements;
+  if (state.sprintBaselineLoading) return state.sprintBaselineLoading;
+  state.sprintBaselineLoading = records(
+    "measurements",
+    { sportProfileId: config.sportProfileId, measurementType: "SPRINT_TIME" },
+    "date",
+    "DESC",
+    100
+  )
+    .then(result => {
+      state.sprintBaselineMeasurements = result.records || [];
+      return state.sprintBaselineMeasurements;
+    })
+    .finally(() => { state.sprintBaselineLoading = null; });
+  return state.sprintBaselineLoading;
+}
+
+function isTimedSprintItem(item) {
+  const title = String(item?.title || "");
+  return item?.section === "sprint"
+    || /^\(\s*\d{2,3}m(?:\s*\+\s*\d{2,3}m)+/.test(title)
+    || /\d{2,3}m.*(?:ダッシュ|スプリント|全力走|流し|テンポ|ビルドアップ)/i.test(title);
+}
+
+function sprintDistances(title) {
+  return [...String(title || "").matchAll(/(\d{2,3})m\b/gi)].map(match => Number(match[1]));
+}
+
+function targetPercentForDistance(item, score, distance) {
+  const bridge = String(item.session?.bridge || "");
+  const match = bridge.match(new RegExp(`${distance}m\\s*(\\d{2,3})(?:\\s*[〜~\\-]\\s*(\\d{2,3}))?\\s*[%％]`, "i"));
+  if (match) return [Number(match[1]), Number(match[2] || match[1])];
+
+  const title = String(item.title || "");
+  if (/神経プライマー/.test(title) && /ダッシュ/.test(title)) return [95, 100];
+  if (/ビルドアップ/.test(title)) return [80, 90];
+  if (/テンポ/.test(title)) return [70, 80];
+  if (/流し/.test(title)) return [80, 90];
+  if (/全力|max-v/i.test(title)) return [98, 100];
+  if (score >= 10) return [98, 100];
+  if (score === 9) return [95, 98];
+  if (score === 8) return [90, 94];
+  if (score === 7) return [85, 89];
+  if (score === 6) return [80, 84];
+  return [70, 79];
+}
+
+function sprintSettingSummary(item, score) {
+  if (!isTimedSprintItem(item)) return item.dose || "当日の指定どおり";
+  const distances = sprintDistances(item.title);
+  if (!distances.length) return `MAX ${formatPercentBand(targetPercentForDistance(item, score, null))}`;
+  return distances.map(distance => `${distance}m ${formatPercentBand(targetPercentForDistance(item, score, distance))}`).join(" / ");
+}
+
+function formatPercentBand(band) {
+  const [low, high] = band || [];
+  if (!Number.isFinite(low)) return "指定％";
+  return low === high ? `${low}%` : `${low}〜${high}%`;
+}
+
+function renderSprintTiming(item, score, measurements) {
+  const section = element("section", "day-menu-timing");
+  const head = element("div", "day-menu-timing__head");
+  head.append(element("h4", "", "設定タイム"), element("span", "", "距離別MAX × 指定速度％"));
+  section.append(head);
+
+  if (!Array.isArray(measurements)) {
+    section.append(element("p", "day-menu-timing__loading", "登録済みのスプリント基準記録を確認中…"));
+    return section;
+  }
+
+  const distances = sprintDistances(item.title);
+  if (!distances.length) {
+    section.append(element("p", "day-menu-timing__loading", `目標速度：MAX ${formatPercentBand(targetPercentForDistance(item, score, null))}`));
+    return section;
+  }
+
+  const grid = element("div", "day-menu-timing__grid");
+  distances.forEach(distance => {
+    const band = targetPercentForDistance(item, score, distance);
+    const baseline = bestSprintBaseline(distance, measurements);
+    const card = element("div", "day-menu-timing__card");
+    card.append(element("strong", "day-menu-timing__distance", `${distance}m`), element("span", "day-menu-timing__percent", `MAX ${formatPercentBand(band)}`));
+    if (baseline) {
+      card.append(
+        element("b", "day-menu-timing__target", sprintTargetTimeText(baseline.timeSec, band, distance)),
+        element("small", "", `参考MAX ${Number(baseline.timeSec).toFixed(2)}秒 / ${formatShortDate(baseline.date)}${baseline.dataQuality === "LIMITED" || baseline.measurementMethod === "UNREPORTED" ? " / 条件未統一" : ""}`)
+      );
+    } else {
+      card.append(
+        element("b", "day-menu-timing__target day-menu-timing__target--missing", "基準記録未登録"),
+        element("small", "", "距離別MAXを登録すると設定タイムを自動算出します。")
+      );
+    }
+    grid.append(card);
+  });
+  section.append(grid);
+  section.append(element("p", "day-menu-timing__note", "設定タイムは距離別MAXの平均速度比から算出する参考値です。比較時は計時方式・スタート・走路・シューズ等の条件をそろえてください。"));
+  return section;
+}
+
+function bestSprintBaseline(distance, measurements) {
+  return measurements
+    .filter(item => Number(item.distanceM) === Number(distance) && Number(item.timeSec || item.measurementValue) > 0)
+    .map(item => ({ ...item, timeSec: Number(item.timeSec || item.measurementValue) }))
+    .sort((a, b) => a.timeSec - b.timeSec)[0] || null;
+}
+
+function sprintTargetTimeText(maxTimeSec, band, distance) {
+  const [low, high] = band;
+  const fastest = maxTimeSec / (high / 100);
+  const slowest = maxTimeSec / (low / 100);
+  const digits = distance <= 60 ? 2 : 1;
+  return `${fastest.toFixed(digits)}〜${slowest.toFixed(digits)}秒`;
 }
 
 function dayMenuSectionPurpose(section) {
