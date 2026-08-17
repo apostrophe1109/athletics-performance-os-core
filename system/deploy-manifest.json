@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_24d44d2fe37e46eab86951fb2f7e3911",
-  "generatedAt": "2026-08-17T08:05:27.425Z",
-  "baseCommitSha": "da6b2698637cfbc16bf5e4eee1dbfe9e838452ad",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、過去診断由来の1.2.2＋__backendProbe候補をsource parity確認用に一時再現する。",
+  "deploymentId": "SITEDEPLOY_f91a4dbec1ef4f62be1bdf17f5765fdb",
+  "generatedAt": "2026-08-17T08:06:32.174Z",
+  "baseCommitSha": "6b3735ec6fe5aa8b291368df741ba7264c725a6d",
+  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、Maintenance SYSTEM_FILEのGit履歴READを既存refOverrideへ接続する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "9531a398c59207de2075c75d6fabc8ddbd3960b16f68a44835be987a626d3462"
+      "contentHash": "6c8dae0ecb716146709ebaf39d8098ae6880dde8438425a259863a4db688c17c"
     }
   ]
 }

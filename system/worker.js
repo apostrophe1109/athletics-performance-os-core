@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.18
+ * Version: 1.4.19
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.18";
+const VERSION = "1.4.19";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -709,7 +709,8 @@ async function getSiteSourceTree(body, env) {
 }
 
 async function getSiteSourceFile(body, env) {
-  const file = await readGitHubSourceFile(body.path, env);
+  const refOverride = typeof body?.commitSha === "string" && /^[0-9a-f]{40}$/i.test(body.commitSha) ? body.commitSha : null;
+  const file = await readGitHubSourceFile(body.path, env, refOverride);
   if (!file.exists) throw Object.assign(new Error("site source fileが見つかりません。"), { code: "SITE_SOURCE_FILE_NOT_FOUND", status: 404 });
   const offset = Math.max(0, Number(body.offset || 0));
   const limit = Math.min(Math.max(Number(body.limit || SITE_SOURCE_CHUNK_MAX), 1), SITE_SOURCE_CHUNK_MAX);
