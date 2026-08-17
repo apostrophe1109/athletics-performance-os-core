@@ -312,7 +312,8 @@ def main():
     }
     if restore_error:
         safe_diag["restoreError"] = restore_error
-    raise RuntimeError("APOS_FRESH_DEPLOY_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
+    if os.environ.get("APOS_RUN_FRESH_DEPLOY_DIAG", "").strip() == "1":
+        raise RuntimeError("APOS_FRESH_DEPLOY_DIAG " + json.dumps(safe_diag, ensure_ascii=False, sort_keys=True))
 
     target = None
     for f in files:
