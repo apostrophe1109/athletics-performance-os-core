@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.14
+ * Version: 1.4.15
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.14";
+const VERSION = "1.4.15";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;

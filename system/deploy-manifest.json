@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_5fa4015615374cdbbbb9ed2c5c213431",
-  "generatedAt": "2026-08-17T07:31:02.419Z",
-  "baseCommitSha": "6814d6615d1a71e965f378f7c14c6b88ec65a2f2",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、allowlist済みApps Scriptデプロイworkflowの実ファイルを安全にREAD可能にする。",
+  "deploymentId": "SITEDEPLOY_c6141e32aa834ac282e0f5f57caf018e",
+  "generatedAt": "2026-08-17T07:31:59.817Z",
+  "baseCommitSha": "58c031b731712b7b4954ba4381a2c18283f0b79a",
+  "changeReason": "今回の障害解消チェーン特例承認に基づき、Repo上のworkflow READ allowlistを本番Workerへデプロイするためversion bumpを反映する。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "286a4a3ca236675380bea43251dbecdffbf2ae50a7a416acf57f863bae6b8191"
+      "contentHash": "cfb4312c48859e0c31508e253aec5225dd87270c8b2ed4a000964159ffe8e814"
     }
   ]
 }
