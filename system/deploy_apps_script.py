@@ -79,7 +79,6 @@ def main():
     code_file_name = os.environ.get("APOS_APPS_SCRIPT_CODE_FILE_NAME","Code").strip() or "Code"
     source_path = os.environ.get("APOS_APPS_SCRIPT_SOURCE_PATH","system/apps-script/Code.gs")
     source = open(source_path, "r", encoding="utf-8").read()
-    source = apply_approved_start_time_fix(source)
     expected_source_sha256 = sha256_text(source)
     token = oauth_access_token()
 
