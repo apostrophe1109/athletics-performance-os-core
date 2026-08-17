@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_39c7c7eed2044e8ca69ce561a2535d2e",
-  "generatedAt": "2026-08-16T20:03:02.090Z",
-  "baseCommitSha": "ec7e2ec7af5a8511261eb9977cd3d1aa96ba2646",
-  "changeReason": "認証障害修正を完遂するため、同一Apps Script projectに新規診断Deploymentを作成しSpreadsheetApp接続を試験する。",
+  "deploymentId": "SITEDEPLOY_27f7524aacbe425ebc247019d9482ba5",
+  "generatedAt": "2026-08-17T06:58:34.591Z",
+  "baseCommitSha": "e022cd7426e1a117ef65e5e2f6c9d56ded74c090",
+  "changeReason": "承認済みMaintenance Previewとして、sessions.startTimeのSheets自動時刻変換によるWRITE_VERIFICATION_FAILEDを修正する。",
   "files": [
     {
-      "path": "system/deploy_apps_script.py",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "11480662e7452714362124c698110ff9993726f4e072ac41e7fb9f267566477e"
+      "contentHash": "ac8122c2b7563b216b6bae7d06f0563f5e9d01c6aae534dee00184e2fa2567ca"
     }
   ]
 }
