@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.13
+ * Version: 1.4.14
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.13";
+const VERSION = "1.4.14";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1369,6 +1369,7 @@ async function getMaintenanceCapabilities(env) {
       destructiveSourceDeleteRequires: "SOURCE_DELETE_APPROVED",
       sourceRootRestricted: true,
       deploymentWorkflowPatchAllowlist: Array.from(MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST),
+      deploymentWorkflowReadAllowlist: Array.from(MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST),
       writeAutoRetry: false,
     },
     deploymentWorkflows: {
@@ -1553,7 +1554,13 @@ async function maintenanceRead(body, auth, env) {
     throw Object.assign(new Error("maintenanceReadのoperationが未対応です。getMaintenanceCapabilitiesで確認してください。"), { code: "MAINTENANCE_OPERATION_UNSUPPORTED", status: 400 });
   }
   const payload = isPlainObject(body.payload) ? body.payload : {};
-  const scopedEnv = maintenanceEnv(env);
+  const workflowReadAllowed = operation === "SYSTEM_FILE" && MAINTENANCE_WORKFLOW_PATCH_ALLOWLIST.has(String(payload.path || ""));
+  const scopedEnv = workflowReadAllowed ? new Proxy(env, {
+    get(target, prop) {
+      if (prop === "APOS_SITE_SOURCE_ROOT") return ".github/workflows";
+      return target[prop];
+    }
+  }) : maintenanceEnv(env);
   if (operation === "SYSTEM_TREE") {
     const result = await getSiteSourceTree({ recursive: payload.recursive !== false }, scopedEnv);
     return { ...result, maintenanceOperation: operation, maintenanceDomain: "SYSTEM" };

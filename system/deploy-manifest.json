@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9e86c75679a74683ba5eecd12be17051",
-  "generatedAt": "2026-08-17T07:29:09.427Z",
-  "baseCommitSha": "422c3fcfcbb1e88fe8b7d22d6183838ab36299ea",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、Apps Scriptデプロイworkflowの1ファイルだけをPATCH_TEXTで安全に修正可能にする。",
+  "deploymentId": "SITEDEPLOY_5fa4015615374cdbbbb9ed2c5c213431",
+  "generatedAt": "2026-08-17T07:31:02.419Z",
+  "baseCommitSha": "6814d6615d1a71e965f378f7c14c6b88ec65a2f2",
+  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、allowlist済みApps Scriptデプロイworkflowの実ファイルを安全にREAD可能にする。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "b896194f49e13457116bca1bc85bb2234357e061c4910146d9ad06ff085a2545"
+      "contentHash": "286a4a3ca236675380bea43251dbecdffbf2ae50a7a416acf57f863bae6b8191"
     }
   ]
 }
