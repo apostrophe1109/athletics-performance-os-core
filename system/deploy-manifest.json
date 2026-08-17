@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_f0c1b0960f0844e4a15a1056c8e77ee4",
-  "generatedAt": "2026-08-17T07:35:30.560Z",
-  "baseCommitSha": "97af093734504be3e86b29b6b2e6d1505198772c",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、Maintenance Apply時の空changesフォールバック不具合を修正する。",
+  "deploymentId": "SITEDEPLOY_4e04d512bce6476684f85e4204dfd23a",
+  "generatedAt": "2026-08-17T07:36:13.887Z",
+  "baseCommitSha": "ebcf744ebdc4028770d3191c28988a4ba2efc4a9",
+  "changeReason": "今回の障害解消チェーン特例承認に基づき、既存deploy gateを保ったままstartTime修正をApps Scriptへ安全に移行する第1段階を反映する。",
   "files": [
     {
-      "path": "system/worker.js",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "b109e92c1da8325d11c197858351263443e08d92f36b9e1aa99e041b08516673"
+      "contentHash": "2b7330617a49a534ba0fa594ceb803546566c1477df2835fb4053dcc31799f43"
+    },
+    {
+      "path": "system/deploy_apps_script.py",
+      "operation": "UPSERT",
+      "contentHash": "d9e66672f19b7b7eb09f71acda192d7f3d1e67c0812bfd2921004b23e88415f0"
     }
   ]
 }

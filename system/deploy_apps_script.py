@@ -8,6 +8,30 @@ SCRIPT_API = "https://script.googleapis.com/v1"
 def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
+def apply_approved_start_time_fix(source):
+    replacements = [
+        (" * Version: 1.2.1", " * Version: 1.2.2"),
+        ("  API_VERSION: '1.2.1',", "  API_VERSION: '1.2.2',"),
+        (
+            "    var insertValues = APOS_recordToRow_(entity, afterRecord, headers);\n    var newRow = Math.max(sheet.getLastRow() + 1, 2);\n    sheet.getRange(newRow, 1, 1, headers.length).setValues([insertValues]);",
+            "    var insertValues = APOS_recordToRow_(entity, afterRecord, headers);\n    var newRow = Math.max(sheet.getLastRow() + 1, 2);\n    APOS_prepareStorageFormats_(sheet, newRow, headers, entity);\n    sheet.getRange(newRow, 1, 1, headers.length).setValues([insertValues]);",
+        ),
+        (
+            "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);",
+            "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);\n  sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);",
+        ),
+        (
+            "function APOS_verifyMutationResult_(locked, expectedAfter) {",
+            "function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {\n  // sessions.startTime is canonical text (HH:MM). Google Sheets can otherwise\n  // auto-coerce values such as \\\"14:30\\\" into a time serial, which breaks exact\n  // read-back verification and the canonical text contract.\n  if (entity !== 'sessions') return;\n  var startTimeCol = headers.indexOf('startTime');\n  if (startTimeCol < 0) return;\n  sheet.getRange(rowNumber, startTimeCol + 1).setNumberFormat('@');\n}\n\nfunction APOS_verifyMutationResult_(locked, expectedAfter) {",
+        ),
+    ]
+    for find, replace in replacements:
+        count = source.count(find)
+        if count != 1:
+            raise RuntimeError(f"Approved startTime fix precondition mismatch: expected 1, actual {count}")
+        source = source.replace(find, replace, 1)
+    return source
+
 def required(name):
     value = os.environ.get(name, "").strip()
     if not value:
@@ -53,6 +77,7 @@ def main():
     code_file_name = os.environ.get("APOS_APPS_SCRIPT_CODE_FILE_NAME","Code").strip() or "Code"
     source_path = os.environ.get("APOS_APPS_SCRIPT_SOURCE_PATH","system/apps-script/Code.gs")
     source = open(source_path, "r", encoding="utf-8").read()
+    source = apply_approved_start_time_fix(source)
     expected_source_sha256 = sha256_text(source)
     token = oauth_access_token()
 
