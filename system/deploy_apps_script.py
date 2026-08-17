@@ -173,6 +173,10 @@ def main():
       return APOS_json_({ success: false, status: 'PROBE_ERROR', mode: mode, errorType: String(error && error.name || 'Error'), elapsedMs: Date.now() - started });
     }
   }"""
+    if probe_replacement in source:
+        source = source.replace(probe_replacement, probe_marker, 1)
+        original_source = source
+        expected_source_sha256 = sha256_text(source)
     if probe_marker not in original_source:
         raise RuntimeError("Temporary backend probe marker was not found; refusing diagnostic deployment")
     probe_source = original_source.replace(probe_marker, probe_replacement, 1)
