@@ -1,19 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9d48e1c6e4eb491f80482c5869d53d7f",
-  "generatedAt": "2026-08-17T05:31:07.533Z",
-  "baseCommitSha": "645bb5e23890fdc10f63525f1da2c48e9cd485fb",
-  "changeReason": "複合ダッシュの1/10誤判定を修正し、REST無記録日の自動完遂判定表示を反映する。",
+  "deploymentId": "SITEDEPLOY_f957d7b537d54fb3bccd1bb8a2c0a8b5",
+  "generatedAt": "2026-08-17T05:39:18.693Z",
+  "baseCommitSha": "539d7522741b08ab6829382a37ad10b9df87dd76",
+  "changeReason": "承認済みのログイン操作改善として、パスフレーズ完全一致時の自動認証・自動遷移を反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "030eb7e14297efd4921c4d136263a217f0a5525296ebfd4505aa5ff74318dac7"
+      "contentHash": "4765aff83d86480bd700839582b0a5c0f6d7add07b24dee898b50f3dbc0ca306"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "83e2d6f776336aef65e61038f42fab65dc0ea64861d25a2fbefc4d07f7b4c345"
+      "contentHash": "bc1b7bc9b4ed4c2cd54326f2c5eec281be0b367ef3a0de85445ff490a0f8977a"
     }
   ]
 }

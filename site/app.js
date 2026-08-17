@@ -1434,7 +1434,7 @@ function showLogin(message = "") {
   const panel = element("section", "panel panel--wide login-panel");
   const form = element("form", "login-form");
   const title = element("h2", "", "本人認証");
-  const copy = element("p", "login-copy", "Athletics Performance OSのデータを表示するには、専用パスフレーズを入力してください。");
+  const copy = element("p", "login-copy", "専用パスフレーズを入力してください。完全に一致すると自動でAthletics Performance OSを開きます。");
   const label = element("label", "login-label", "パスフレーズ");
   label.htmlFor = "web-password";
   const input = element("input", "login-input");
@@ -1443,34 +1443,77 @@ function showLogin(message = "") {
   input.type = "password";
   input.autocomplete = "current-password";
   input.required = true;
-  const button = element("button", "login-button", "認証して表示");
+  const button = element("button", "login-button", "手動で認証");
   button.type = "submit";
   const status = element("p", "login-status", message);
   status.setAttribute("aria-live", "polite");
-  form.append(title, copy, label, input, button, status);
-  form.addEventListener("submit", async event => {
-    event.preventDefault();
+
+  let autoTimer = null;
+  let authInFlight = false;
+  let lastAttemptedPassword = "";
+  let authSequence = 0;
+
+  const authenticate = async ({ automatic = false } = {}) => {
+    const password = input.value;
+    if (!password || authInFlight) return;
+    if (automatic && password === lastAttemptedPassword) return;
+
+    const sequence = ++authSequence;
+    const submittedPassword = password;
+    lastAttemptedPassword = password;
+    authInFlight = true;
     button.disabled = true;
     button.textContent = "認証中…";
-    status.textContent = "";
+    if (!automatic) status.textContent = "";
+
     try {
-      const result = await authRequest("/auth/login", { password: input.value });
+      const result = await authRequest("/auth/login", { password: submittedPassword });
+      if (sequence !== authSequence || input.value !== submittedPassword) return;
       if (!result.success || !result.token) throw new Error(result.error || "認証に失敗しました。");
       state.webSessionToken = result.token;
       sessionStorage.setItem("aposWebSession", result.token);
       input.value = "";
+      setConnection("idle", "認証済み・読み込み中");
       await loadDashboardData();
     } catch (error) {
+      if (sequence !== authSequence) return;
       if (error?.code === "WEB_AUTH_REQUIRED") {
         showLogin("セッションを確認できませんでした。もう一度認証してください。");
         return;
       }
-      status.textContent = error.message || "認証に失敗しました。";
-      input.select();
+      if (!automatic) {
+        status.textContent = error.message || "認証に失敗しました。";
+        input.select();
+      }
     } finally {
-      button.disabled = false;
-      button.textContent = "認証して表示";
+      if (sequence === authSequence) {
+        authInFlight = false;
+        button.disabled = false;
+        button.textContent = "手動で認証";
+      }
     }
+  };
+
+  const scheduleAutoLogin = () => {
+    clearTimeout(autoTimer);
+    authSequence += 1;
+    authInFlight = false;
+    const value = input.value;
+    if (!value) {
+      lastAttemptedPassword = "";
+      status.textContent = "";
+      return;
+    }
+    status.textContent = "";
+    autoTimer = setTimeout(() => authenticate({ automatic: true }), 320);
+  };
+
+  input.addEventListener("input", scheduleAutoLogin);
+  form.append(title, copy, label, input, button, status);
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    clearTimeout(autoTimer);
+    authenticate({ automatic: false }).catch(showFatalError);
   });
   panel.append(form);
   dashboard.append(panel);
