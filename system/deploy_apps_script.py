@@ -9,7 +9,50 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 def apply_approved_start_time_fix(source):
+    if " * Version: 1.2.4" in source and "APOS_isCompactSessionStartTimeLocked_" in source:
+        return source
     if " * Version: 1.2.3" in source and "changedCells: changedCells" in source:
+        replacements_v124 = [
+            (" * Version: 1.2.3", " * Version: 1.2.4"),
+            ("  API_VERSION: '1.2.3',", "  API_VERSION: '1.2.4',"),
+            (
+                "  if (proposal && after && after.sportProfileId && String(after.sportProfileId) !== String(proposal.sportProfileId)) {\n    APOS_throw_('PROPOSAL_SPORT_PROFILE_MISMATCH', '提案のsportProfileIdと変更対象が一致しません。');\n  }\n  var now = new Date();",
+                "  if (proposal && after && after.sportProfileId && String(after.sportProfileId) !== String(proposal.sportProfileId)) {\n    APOS_throw_('PROPOSAL_SPORT_PROFILE_MISMATCH', '提案のsportProfileIdと変更対象が一致しません。');\n  }\n  var compactStartTimeOnly = entity === 'sessions' && actualOperation === 'UPDATE';\n  if (compactStartTimeOnly) {\n    var suppliedChangeKeys = Object.keys(suppliedChanges).filter(function(field) { return field !== config.key; });\n    compactStartTimeOnly = suppliedChangeKeys.length === 1 && suppliedChangeKeys[0] === 'startTime';\n  }\n  if (compactStartTimeOnly) {\n    var compactFields = [config.key, 'sportProfileId', 'sessionDate', 'startTime', 'updatedAt'];\n    var compactBefore = {};\n    var compactAfter = {};\n    compactFields.forEach(function(field) {\n      if (before && Object.prototype.hasOwnProperty.call(before, field)) compactBefore[field] = before[field];\n      if (after && Object.prototype.hasOwnProperty.call(after, field)) compactAfter[field] = after[field];\n    });\n    before = compactBefore;\n    after = compactAfter;\n    if (proposal) {\n      proposal.beforeJson = APOS_clone_(compactBefore);\n      proposal.proposedJson = APOS_clone_(compactAfter);\n    }\n  }\n  var now = new Date();",
+            ),
+            (
+                "    beforePayload: locked.before ? APOS_stableStringify_(locked.before) : null,",
+                "    beforePayload: rowChange.beforeRecord ? APOS_stableStringify_(rowChange.beforeRecord) : (locked.before ? APOS_stableStringify_(locked.before) : null),",
+            ),
+            (
+                "function APOS_executeRowMutation_(locked, approval) {",
+                "function APOS_isCompactSessionStartTimeLocked_(locked) {\n  if (!locked || locked.entity !== 'sessions' || locked.actualOperation !== 'UPDATE' || !locked.before || !locked.after) return false;\n  var allowed = { sessionId: true, sportProfileId: true, sessionDate: true, startTime: true, updatedAt: true };\n  var beforeKeys = Object.keys(locked.before);\n  var afterKeys = Object.keys(locked.after);\n  if (!Object.prototype.hasOwnProperty.call(locked.after, 'startTime')) return false;\n  return beforeKeys.length <= 5 && afterKeys.length <= 5 &&\n    beforeKeys.every(function(key) { return allowed[key] === true; }) &&\n    afterKeys.every(function(key) { return allowed[key] === true; });\n}\n\nfunction APOS_executeRowMutation_(locked, approval) {",
+            ),
+            (
+                "  var found = APOS_findByKey_(entity, locked.key);\n  var afterRecord = locked.after ? APOS_clone_(locked.after) : null;",
+                "  var found = APOS_findByKey_(entity, locked.key);\n  var compactStartTimeUpdate = APOS_isCompactSessionStartTimeLocked_(locked);\n  var currentBeforeRecord = found ? APOS_clone_(found.record) : null;\n  var afterRecord = locked.after ? (compactStartTimeUpdate ? APOS_merge_(currentBeforeRecord, locked.after) : APOS_clone_(locked.after)) : null;",
+            ),
+            (
+                "    APOS_validateRecord_(entity, afterRecord, { operation: locked.actualOperation, before: locked.before });",
+                "    APOS_validateRecord_(entity, afterRecord, { operation: locked.actualOperation, before: compactStartTimeUpdate ? currentBeforeRecord : locked.before });",
+            ),
+            (
+                "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var beforeExpectedRow = APOS_recordToRow_(entity, locked.before, headers);\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  var changedCells = [];",
+                "  var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];\n  var comparisonBeforeRecord = compactStartTimeUpdate ? currentBeforeRecord : locked.before;\n  var beforeExpectedRow = APOS_recordToRow_(entity, comparisonBeforeRecord, headers);\n  var afterRow = APOS_recordToRow_(entity, afterRecord, headers);\n  var changedCells = [];",
+            ),
+            (
+                "    var beforeValue = locked.before ? locked.before[field] : null;",
+                "    var beforeValue = comparisonBeforeRecord ? comparisonBeforeRecord[field] : null;",
+            ),
+            (
+                "  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, afterRecord: afterRecord };",
+                "  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, beforeRecord: currentBeforeRecord, afterRecord: afterRecord };",
+            ),
+        ]
+        for find, replace in replacements_v124:
+            count = source.count(find)
+            if count != 1:
+                raise RuntimeError(f"Approved compact startTime preview fix precondition mismatch: expected 1, actual {count}")
+            source = source.replace(find, replace, 1)
         return source
     if " * Version: 1.2.2" in source and "function APOS_prepareStorageFormats_(" in source:
         replacements_v123 = [

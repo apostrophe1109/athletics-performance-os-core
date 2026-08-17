@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e7ce3cbd57f94ddca047d8c90ea96d29",
-  "generatedAt": "2026-08-17T14:00:47.686Z",
-  "baseCommitSha": "b870152975e6de0e07ee8adba47fbe385aff40e5",
-  "changeReason": "承認済み開始時刻変更の障害解消として、稼働中Apps Script 1.2.3をGitHub正本へ同期しsource parityを回復する。",
+  "deploymentId": "SITEDEPLOY_e38f5c510708401fbb87a8c659416874",
+  "generatedAt": "2026-08-17T14:02:59.240Z",
+  "baseCommitSha": "8abd7ded5f0c5e507d1ab94fadfb4a4fe3818b77",
+  "changeReason": "承認済み開始時刻変更を完遂するため、startTime単項目UPDATEだけlockedPreviewを小型化するApps Script 1.2.4対応を反映する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/deploy_apps_script.py",
       "operation": "UPSERT",
-      "contentHash": "38f6cc790df5dbbd5b41ae10d24f239e6d951599d598fea3397bd7c7077165fc"
+      "contentHash": "07aba4b34a26db5d7e2bace912e010565dde01d5d0537fa51ed0b87872c03dba"
     }
   ]
 }
