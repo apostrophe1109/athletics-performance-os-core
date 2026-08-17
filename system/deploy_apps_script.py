@@ -9,6 +9,8 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 def apply_approved_start_time_fix(source):
+    if " * Version: 1.2.2" in source and "function APOS_prepareStorageFormats_(" in source:
+        return source
     replacements = [
         (" * Version: 1.2.1", " * Version: 1.2.2"),
         ("  API_VERSION: '1.2.1',", "  API_VERSION: '1.2.2',"),
