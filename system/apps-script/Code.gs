@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Google Apps Script API
- * Version: 1.2.1
+ * Version: 1.2.2
  * Target spreadsheet:
  *   1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw
  *
@@ -14,7 +14,7 @@
  */
 
 var APOS_CONFIG = Object.freeze({
-  API_VERSION: '1.2.1',
+  API_VERSION: '1.2.2',
   SCHEMA_VERSION: '1.1.0',
   SYSTEM_NAME: 'Athletics Performance OS',
   SPREADSHEET_ID: '1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw',
@@ -1180,6 +1180,7 @@ function APOS_executeRowMutation_(locked, approval) {
     if (found) APOS_throw_('CONCURRENT_DUPLICATE_KEY', 'Preview後に同じIDが追加されました。');
     var insertValues = APOS_recordToRow_(entity, afterRecord, headers);
     var newRow = Math.max(sheet.getLastRow() + 1, 2);
+    APOS_prepareStorageFormats_(sheet, newRow, headers, entity);
     sheet.getRange(newRow, 1, 1, headers.length).setValues([insertValues]);
     return { kind: 'INSERT', sheetName: config.sheet, rowNumber: newRow, beforeRow: null, afterRow: insertValues, afterRecord: afterRecord };
   }
@@ -1191,8 +1192,19 @@ function APOS_executeRowMutation_(locked, approval) {
   }
   var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];
   var afterRow = APOS_recordToRow_(entity, afterRecord, headers);
+  APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);
   sheet.getRange(found.rowNumber, 1, 1, headers.length).setValues([afterRow]);
   return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, afterRecord: afterRecord };
+}
+
+function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {
+  // sessions.startTime is canonical text (HH:MM). Google Sheets can otherwise
+  // auto-coerce values such as "14:30" into a time serial, which breaks exact
+  // read-back verification and the canonical text contract.
+  if (entity !== 'sessions') return;
+  var startTimeCol = headers.indexOf('startTime');
+  if (startTimeCol < 0) return;
+  sheet.getRange(rowNumber, startTimeCol + 1).setNumberFormat('@');
 }
 
 function APOS_verifyMutationResult_(locked, expectedAfter) {

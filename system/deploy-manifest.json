@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_d8b7f2ce086845ec9f6b59602dafbace",
-  "generatedAt": "2026-08-17T07:38:54.196Z",
-  "baseCommitSha": "45a14879b64e560d9c2211a69d63293ee6758ed8",
-  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、デプロイ失敗診断をログ404でも継続可能にする。",
+  "deploymentId": "SITEDEPLOY_743b21f4eb0044dc9cf986408a81f213",
+  "generatedAt": "2026-08-17T07:55:26.289Z",
+  "baseCommitSha": "725243325d04338e9373db5ed841ed548515f4c8",
+  "changeReason": "今回の障害解消チェーンに対する特例承認に基づき、公開Apps Script 1.2.2とGitHub正本Code.gsを一致させる。",
   "files": [
     {
-      "path": "system/worker.js",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "37035ee3f562eed6490e8eb947310ebf5ef277b9be5371b0a028030a6dbaa0ce"
+      "contentHash": "ac8122c2b7563b216b6bae7d06f0563f5e9d01c6aae534dee00184e2fa2567ca"
     }
   ]
 }
