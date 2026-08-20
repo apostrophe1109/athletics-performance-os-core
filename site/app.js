@@ -452,7 +452,7 @@ function compactBridgeItems(raw) {
 function dayMenuEntries(context, sessions) {
   const menu = context.menuItems || [];
   if (menu.length) {
-    return menu.map((item, index) => {
+    const entries = menu.map((item, index) => {
       const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
       const detail = item.cue || item.purpose || "";
       const searchable = [title, detail, item.category, item.block, item.section].filter(Boolean).join(" ");
@@ -471,6 +471,7 @@ function dayMenuEntries(context, sessions) {
         session: sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null
       };
     });
+    return groupHighSpeedConversionEntries(entries);
   }
 
   const bridgeEntries = sessions.flatMap(session => compactBridgeItems(session.bridge)
@@ -487,7 +488,7 @@ function dayMenuEntries(context, sessions) {
         session
       };
     }));
-  if (bridgeEntries.length) return bridgeEntries;
+  if (bridgeEntries.length) return groupHighSpeedConversionEntries(bridgeEntries);
 
   return sessions.map(session => ({
     title: session.title || session.role || "セッション",
@@ -499,6 +500,106 @@ function dayMenuEntries(context, sessions) {
     exerciseId: null,
     session
   }));
+}
+
+function groupHighSpeedConversionEntries(entries) {
+  const source = Array.isArray(entries) ? entries : [];
+  const output = [];
+  let index = 0;
+
+  while (index < source.length) {
+    const start = source[index];
+    if (!isHighSpeedConversionStart(start?.title)) {
+      output.push(start);
+      index += 1;
+      continue;
+    }
+
+    const sequences = [];
+    const groupedEntries = [];
+    const session = start.session || null;
+
+    while (index < source.length && isHighSpeedConversionStart(source[index]?.title)) {
+      const sequenceEntries = [source[index]];
+      const steps = [stripHighSpeedConversionPrefix(source[index].title)];
+      groupedEntries.push(source[index]);
+      index += 1;
+
+      while (index < source.length && !isHighSpeedConversionStart(source[index]?.title)) {
+        const entry = source[index];
+        const title = String(entry?.title || "").trim();
+        steps.push(title);
+        sequenceEntries.push(entry);
+        groupedEntries.push(entry);
+        index += 1;
+        if (isHighSpeedConversionDash(title)) break;
+      }
+
+      const sequence = { steps: steps.filter(Boolean), entries: sequenceEntries, restAfter: "" };
+      if (
+        index < source.length
+        && isHighSpeedConversionRecovery(source[index]?.title)
+        && index + 1 < source.length
+        && isHighSpeedConversionStart(source[index + 1]?.title)
+      ) {
+        sequence.restAfter = String(source[index].title || "").trim();
+        groupedEntries.push(source[index]);
+        index += 1;
+      }
+      sequences.push(sequence);
+
+      if (index >= source.length || !isHighSpeedConversionStart(source[index]?.title)) break;
+    }
+
+    const setCount = highSpeedConversionSetCount(session, sequences.length);
+    const detailLines = sequences.map((sequence, sequenceIndex) => {
+      const rest = sequence.restAfter ? ` / ${sequence.restAfter}` : "";
+      return `${sequenceIndex + 1}セット目：${sequence.steps.join(" → ")}${rest}`;
+    });
+    const scores = groupedEntries
+      .map(item => Number(item?.intensityScore))
+      .filter(Number.isFinite);
+
+    output.push({
+      title: "高速変換コンプレックス",
+      detail: `${setCount}セット実施（導入刺激→低振幅ポゴ→20mダッシュまでで1セット）\n${detailLines.join("\n")}`,
+      dose: `合計${setCount}セット`,
+      section: "primer",
+      intensityScore: scores.length ? Math.max(...scores) : resolvedTrainingIntensity("高速変換コンプレックス 20mダッシュ", session),
+      intensityEstimated: false,
+      exerciseId: null,
+      session,
+      complexSteps: sequences.map(sequence => sequence.steps),
+      complexSetCount: setCount
+    });
+  }
+
+  return output.filter(Boolean);
+}
+
+function isHighSpeedConversionStart(value) {
+  return /^高速変換[：:]\s*/.test(String(value || "").trim());
+}
+
+function stripHighSpeedConversionPrefix(value) {
+  return String(value || "").trim().replace(/^高速変換[：:]\s*/, "");
+}
+
+function isHighSpeedConversionDash(value) {
+  return /20m(?:ダッシュ|プライマー)/.test(String(value || ""));
+}
+
+function isHighSpeedConversionRecovery(value) {
+  return /^(?:完全回復)?\s*\d+(?:〜\d+)?分(?:完全)?(?:回復|休息)?$|^\d+(?:〜\d+)?分完全休息$/.test(String(value || "").trim());
+}
+
+function highSpeedConversionSetCount(session, sequenceCount) {
+  const requirements = String(session?.requirements || "");
+  const each = requirements.match(/各(\d+)ラウンド/);
+  if (each && sequenceCount > 1) return Math.max(1, Number(each[1])) * sequenceCount;
+  const single = requirements.match(/(\d+)ラウンド(?:のみ)?/);
+  if (single && sequenceCount === 1) return Math.max(1, Number(single[1]));
+  return Math.max(1, sequenceCount);
 }
 
 function dayMenuDetailKey(item, index) {
@@ -593,6 +694,14 @@ function appendDayMenuSteps(parent, steps) {
 }
 
 function buildDayMenuSteps(item, exercise, score) {
+  if (Array.isArray(item?.complexSteps) && item.complexSteps.length) {
+    const steps = item.complexSteps.map((sequence, index) => `${index + 1}セット目：${sequence.join(" → ")}。20mダッシュ完了までを1セットとして数える。`);
+    if (Number(item.complexSetCount) > item.complexSteps.length && item.complexSteps.length === 1) {
+      steps.push(`同じ一連の流れを合計${item.complexSetCount}セットになるまで繰り返す。セット間は当日の指定休息を確保する。`);
+    }
+    return steps;
+  }
+
   const splitSteps = splitSprintProcedure(item, score);
   if (splitSteps.length) return splitSteps;
 
