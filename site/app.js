@@ -1213,7 +1213,7 @@ function renderWeekView() {
 
     const top = element("div", "week-day__top");
     top.append(
-      element("span", "week-day__date", `${date.slice(8)} ${weekdayName(date)}`),
+      element("span", "week-day__date", `${weekdayName(date)} ${date.slice(5).replace("-", "/")}`),
       element("span", "week-day__role", compactTrainingLabel(primary)),
       intensityMini(score)
     );
@@ -1222,17 +1222,32 @@ function renderWeekView() {
     const title = primary?.title || primary?.role || "予定なし";
     card.append(element("strong", "week-day__body", title));
 
-    const highlights = sessionHighlights(primary, 3);
-    if (highlights.length) {
-      const details = element("ul", "week-day__details");
-      highlights.forEach(item => details.append(element("li", "", item)));
-      card.append(details);
+    const details = sessionOutline(primary);
+    if (details.length) {
+      const detailList = element("ul", "week-day__details");
+      details.forEach(item => detailList.append(element("li", "", item)));
+      card.append(detailList);
     }
 
     if (primary?.purpose) {
       const intent = element("p", "week-day__intent");
-      intent.append(element("span", "", "意図"), document.createTextNode(` ${primary.purpose}`));
+      intent.append(element("span", "", "目的"), document.createTextNode(` ${primary.purpose}`));
       card.append(intent);
+    }
+    if (primary?.cue) {
+      const cue = element("p", "week-day__cue");
+      cue.append(element("span", "", "キュー"), document.createTextNode(` ${primary.cue}`));
+      card.append(cue);
+    }
+    if (primary?.requirements) {
+      const requirements = element("p", "week-day__requirements");
+      requirements.append(element("span", "", "条件"), document.createTextNode(` ${primary.requirements}`));
+      card.append(requirements);
+    }
+    if (primary?.stopCondition) {
+      const stop = element("p", "week-day__stop");
+      stop.append(element("span", "", "終了基準"), document.createTextNode(` ${primary.stopCondition}`));
+      card.append(stop);
     }
 
     card.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
@@ -1365,7 +1380,7 @@ function sessionOutline(session) {
   if (!session) return [];
   const raw = String(session.bridge || "").trim();
   if (!raw) return session.purpose ? [session.purpose] : [];
-  return compactBridgeItems(raw).slice(0, 7);
+  return compactBridgeItems(raw);
 }
 
 function sessionHighlights(session, maxItems = 3) {
@@ -1409,7 +1424,7 @@ function renderSecondaryWorkspace() {
   [
     ["history", "実施記録"],
     ["exercises", "種目ライブラリ"],
-    ["measurements", "計測・コンディション"]
+    ["measurements", "計測基準・記録"]
   ].forEach(([view, label]) => {
     const button = element("button", "secondary-tab", label);
     button.type = "button";
@@ -1662,18 +1677,107 @@ function appendExerciseDetail(parent, label, value) {
 
 function renderMeasurements() {
   const panel = element("section", "secondary-panel");
-  panel.append(sectionHeader("計測・コンディション", state.measurementTrendsLoaded ? "最大30件から推移表示" : "実測値"));
-  const list = element("div", "metric-grid");
+  panel.append(sectionHeader("計測基準・記録", state.measurementTrendsLoaded ? "値の出所・計測条件を明示" : "参考値の根拠を表示"));
   if (state.measurementLoading) {
-    list.append(empty("計測データの推移を読み込み中…"));
-    panel.append(list);
+    const loading = element("div", "metric-grid");
+    loading.append(empty("計測データを読み込み中…"));
+    panel.append(loading);
     return panel;
   }
-  const groups = groupMeasurements(state.measurements);
-  if (!groups.length) list.append(empty("計測記録はまだありません。"));
-  groups.slice(0, 8).forEach(([type, items]) => list.append(measurementMetricCard(type, items)));
-  panel.append(list);
+
+  const sprintItems = state.measurements.filter(item => item.measurementType === "SPRINT_TIME");
+  const conditionItems = state.measurements.filter(item => item.measurementType !== "SPRINT_TIME");
+
+  const sprintBlock = element("section", "measurement-block");
+  const sprintHead = element("div", "measurement-block__head");
+  sprintHead.append(
+    element("h3", "", "スプリント基準記録"),
+    element("p", "", "設定タイム算出に使う距離別の参考MAX。実測・申告の別と計測条件をそのまま表示します。")
+  );
+  sprintBlock.append(sprintHead);
+  const sprintGrid = element("div", "metric-grid metric-grid--sprint");
+  const sprintGroups = sprintMeasurementGroups(sprintItems);
+  if (!sprintGroups.length) sprintGrid.append(empty("スプリント基準記録はまだありません。"));
+  sprintGroups.forEach(([distance, items]) => sprintGrid.append(sprintBaselineMetricCard(distance, items)));
+  sprintBlock.append(sprintGrid);
+  panel.append(sprintBlock);
+
+  const conditionBlock = element("section", "measurement-block");
+  const conditionHead = element("div", "measurement-block__head");
+  conditionHead.append(
+    element("h3", "", "コンディション実測"),
+    element("p", "", "睡眠・安静時心拍・HRVなど、正本に実測記録がある項目だけを表示します。推定値は作りません。")
+  );
+  conditionBlock.append(conditionHead);
+  const conditionGrid = element("div", "metric-grid");
+  const groups = groupMeasurements(conditionItems);
+  if (!groups.length) {
+    conditionGrid.append(empty("現在、日々のコンディション実測値は正本に登録されていません。登録されるまで推定表示は行いません。"));
+  } else {
+    groups.slice(0, 8).forEach(([type, items]) => conditionGrid.append(measurementMetricCard(type, items)));
+  }
+  conditionBlock.append(conditionGrid);
+  panel.append(conditionBlock);
   return panel;
+}
+
+function sprintMeasurementGroups(items) {
+  const groups = new Map();
+  items.forEach(item => {
+    const distance = Number(item.distanceM);
+    if (!Number.isFinite(distance) || distance <= 0) return;
+    if (!groups.has(distance)) groups.set(distance, []);
+    groups.get(distance).push(item);
+  });
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+function sprintBaselineMetricCard(distance, items) {
+  const baseline = bestSprintBaseline(distance, items) || items.at(-1) || {};
+  const card = element("article", "metric-card metric-card--baseline");
+  const top = element("div", "metric-card__top");
+  top.append(
+    element("span", "metric-card__label", `${distance}m 基準MAX`),
+    element("span", "metric-card__date", sprintMeasurementDateLabel(baseline))
+  );
+  const value = element("div", "metric-card__value");
+  value.append(
+    element("strong", "", Number.isFinite(Number(baseline.timeSec || baseline.measurementValue)) ? `${Number(baseline.timeSec || baseline.measurementValue).toFixed(2)}` : "—"),
+    element("span", "", baseline.unit || "s")
+  );
+  card.append(top, value);
+
+  const source = element("div", "metric-card__source");
+  source.append(
+    element("span", "", measurementQualityLabel(baseline)),
+    element("span", "", measurementMethodLabel(baseline.measurementMethod))
+  );
+  card.append(source);
+  if (baseline.measurementConditions) card.append(element("p", "metric-card__conditions", baseline.measurementConditions));
+  if (baseline.notes) card.append(element("p", "metric-card__note", baseline.notes));
+  return card;
+}
+
+function sprintMeasurementDateLabel(item) {
+  const text = `${item?.measurementConditions || ""} ${item?.notes || ""}`;
+  if (/実計測日不明/.test(text)) return `実計測日 不明 / 登録 ${formatShortDate(item?.date)}`;
+  return `計測 ${formatShortDate(item?.date)}`;
+}
+
+function measurementMethodLabel(method) {
+  const labels = {
+    MANUAL: "手動計時",
+    ELECTRONIC: "電子計時",
+    VIDEO: "動画計時",
+    UNREPORTED: "計時方式未報告"
+  };
+  return labels[String(method || "").toUpperCase()] || "計時方式未登録";
+}
+
+function measurementQualityLabel(item) {
+  if (String(item?.dataQuality || "").toUpperCase() === "LIMITED") return "参考値・条件限定";
+  if (String(item?.evaluation || "").toUpperCase() === "REFERENCE_ONLY") return "参考値";
+  return "実測記録";
 }
 
 function groupMeasurements(items) {

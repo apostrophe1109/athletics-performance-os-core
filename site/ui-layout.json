@@ -35,7 +35,7 @@
     {"id":"month","type":"month","title":"月間トレーニング"},
     {"id":"history","type":"history","title":"最近の実施記録"},
     {"id":"exercise-library","type":"exerciseLibrary","title":"種目ライブラリ"},
-    {"id":"measurements","type":"measurements","title":"計測・コンディション"}
+    {"id":"measurements","type":"measurements","title":"計測基準・記録"}
   ],
   "secondarySections": ["history", "exerciseLibrary", "measurements"]
 }

@@ -1,19 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_fe540243545c41709c1270ee97a0fa42",
-  "generatedAt": "2026-08-17T22:00:24.166Z",
-  "baseCommitSha": "54829d6e3d92a0cce064f7ed622e3147cafacff8",
-  "changeReason": "承認済みの音声入力UI変更として、本日の練習内容を独立スクロール表示し、他UIへ重ならない構成をsiteへ反映して公開確認する。",
+  "deploymentId": "SITEDEPLOY_b99f155b7245405a93cc1b74116c5cc8",
+  "generatedAt": "2026-08-20T04:44:32.738Z",
+  "baseCommitSha": "ba161325e5e1a13c73f2360ab448344145781345",
+  "changeReason": "承認済み最終デザインPreviewをサイトへ反映する。現行commitをRollback基準として保持する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "caf4acf0efb21f42aeb972cd9e68806975d6bf6f839a18e03b5b137f11cb207e"
+      "contentHash": "b7e3ca6240a822604bc0d7e7bfc03515eca173007a98d2b7a10fa7574af3850b"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "bb2fe534820cc8c9ae3291ecaccee1c6f8361e5a8c86c3ba655c7fcf68eb4b05"
+      "contentHash": "0164cbb3c9326cfbc906dd69adbe2fc3ff064ca4513a52f4f1785616382656f6"
+    },
+    {
+      "path": "site/ui-layout.json",
+      "operation": "UPSERT",
+      "contentHash": "bac20b5caf2217cfff6420514d957b528e9c780c4540534463399f6ba51f32aa"
     }
   ]
 }
