@@ -182,18 +182,19 @@ async function loadBackgroundData({ force = false } = {}) {
   }
 }
 
-async function loadDayContext(date, { force = false } = {}) {
+async function loadDayContext(date, { force = false, motion = false } = {}) {
   state.selectedDate = date;
   state.viewMode = "day";
   if (!force && state.dayCache.has(date)) {
     state.dayContext = state.dayCache.get(date);
-    renderDashboard();
+    renderDashboard({ motion });
     setConnection("ready", "キャッシュ表示");
     return;
   }
   setConnection("idle", "日別データ取得中");
   try {
-    await loadDayData(date, { force, render: true });
+    await loadDayData(date, { force, render: false });
+    renderDashboard({ motion });
     setConnection("ready", "最新データ");
   } catch (error) {
     setConnection("error", "取得エラー");
@@ -201,10 +202,30 @@ async function loadDayContext(date, { force = false } = {}) {
   }
 }
 
-function renderDashboard() {
-  dashboard.replaceChildren();
-  dashboard.append(renderTrainingWorkspace(), renderSecondaryWorkspace());
-  dashboard.setAttribute("aria-busy", "false");
+let activeViewTransition = null;
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+}
+
+function renderDashboard({ motion = false } = {}) {
+  const commit = () => {
+    dashboard.dataset.motion = String(motion);
+    dashboard.replaceChildren();
+    dashboard.append(renderTrainingWorkspace(), renderSecondaryWorkspace());
+    dashboard.setAttribute("aria-busy", "false");
+  };
+
+  if (motion && typeof document.startViewTransition === "function" && !prefersReducedMotion()) {
+    activeViewTransition?.skipTransition?.();
+    const transition = document.startViewTransition(commit);
+    activeViewTransition = transition;
+    transition.finished.finally(() => {
+      if (activeViewTransition === transition) activeViewTransition = null;
+    });
+    return;
+  }
+  commit();
 }
 
 function renderTrainingWorkspace() {
@@ -266,7 +287,7 @@ async function switchViewMode(mode) {
   state.viewMode = mode;
   const date = state.selectedDate || state.today;
   if (mode === "day") {
-    await loadDayContext(date);
+    await loadDayContext(date, { motion: true });
     return;
   }
   if (mode === "week") {
@@ -276,7 +297,7 @@ async function switchViewMode(mode) {
     const range = monthRange(date);
     await ensureSessionsForRange(range.start, range.end);
   }
-  renderDashboard();
+  renderDashboard({ motion: true });
 }
 
 function renderDayView() {
@@ -1359,7 +1380,7 @@ function renderWeekView() {
       card.append(stop);
     }
 
-    card.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
+    card.addEventListener("click", () => loadDayContext(date, { motion: true }).catch(showFatalError));
     list.append(card);
   });
   wrap.append(list);
@@ -1396,7 +1417,7 @@ function renderMonthView() {
         element("span", "month-day__main", monthMainText(primary))
       );
     }
-    cell.addEventListener("click", () => loadDayContext(date).catch(showFatalError));
+    cell.addEventListener("click", () => loadDayContext(date, { motion: true }).catch(showFatalError));
     grid.append(cell);
   }
   wrap.append(grid);
@@ -1425,7 +1446,7 @@ async function navigatePeriod(mode, direction) {
   const current = state.selectedDate || state.today;
   setConnection("idle", "期間データ取得中");
   if (mode === "day") {
-    await loadDayContext(addDays(current, direction));
+    await loadDayContext(addDays(current, direction), { motion: true });
     return;
   }
   if (mode === "week") {
@@ -1437,14 +1458,14 @@ async function navigatePeriod(mode, direction) {
     const range = monthRange(state.selectedDate);
     await ensureSessionsForRange(range.start, range.end);
   }
-  renderDashboard();
+  renderDashboard({ motion: true });
   setConnection("ready", "最新データ");
 }
 
 async function navigateToToday(mode) {
   state.selectedDate = state.today;
   if (mode === "day") {
-    await loadDayContext(state.today);
+    await loadDayContext(state.today, { motion: true });
     return;
   }
   if (mode === "week") {
@@ -1455,7 +1476,7 @@ async function navigateToToday(mode) {
     await ensureSessionsForRange(range.start, range.end);
   }
   state.viewMode = mode;
-  renderDashboard();
+  renderDashboard({ motion: true });
   setConnection("ready", "最新データ");
 }
 
@@ -1554,18 +1575,18 @@ function renderSecondaryWorkspace() {
 async function switchSecondaryView(view) {
   state.secondaryView = view;
   if (view !== "measurements" || state.measurementTrendsLoaded || state.measurementLoading) {
-    renderDashboard();
+    renderDashboard({ motion: true });
     return;
   }
   state.measurementLoading = true;
-  renderDashboard();
+  renderDashboard({ motion: true });
   try {
     const result = await records("measurements", { sportProfileId: config.sportProfileId }, "date", "DESC", 30);
     state.measurements = result.records || [];
     state.measurementTrendsLoaded = true;
   } finally {
     state.measurementLoading = false;
-    renderDashboard();
+    renderDashboard({ motion: true });
   }
 }
 

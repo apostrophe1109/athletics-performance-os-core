@@ -1,19 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_5c06fcc7e4cf48709083bb64f8479e5e",
-  "generatedAt": "2026-08-20T05:16:09.187Z",
-  "baseCommitSha": "d412d3d04198c019c78607a0e958a9ad87c0fdf5",
-  "changeReason": "既承認の高速変換集約表示を内容変更なしで反映する。導入刺激→低振幅ポゴ→20mダッシュ完了までを1セットとして合計セット数を明記する。",
+  "deploymentId": "SITEDEPLOY_74a487d5757c4796bfff3f811847ad7a",
+  "generatedAt": "2026-08-21T03:21:15.532Z",
+  "baseCommitSha": "e7b486c07da2e5c4c3e06be22d05ff9f2f607d5f",
+  "changeReason": "承認済みPreviewのAPOS Viewアニメーション改善を反映する",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "592154c3333e186c5568d7d540836822e24ff2fb00c03ccf05e118fb2ff7946e"
+      "contentHash": "1f0760a3806fcf250977fa61d2b4a1ce32577e1d29295702c524b05650afa7f0"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "5f85b73b4a563218ff760964280e0531a8fee726af9e3d6de2b5c7078a1cf12e"
+      "contentHash": "eb29cc8883cad6c803a1a16c0bb4a1c613f6de671f70cfad95a961d837cb8f6b"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "e656661d9ff4942433f2c6e073465840f9552e6f6621a19db440f13c4dfcc31b"
     }
   ]
 }

@@ -12,6 +12,11 @@
   --intensity-high: #ff6b6b;
   --line: rgba(255,255,255,.10);
   --radius: 22px;
+  --motion-fast: 160ms;
+  --motion-base: 280ms;
+  --motion-slow: 380ms;
+  --motion-ease: cubic-bezier(.22,1,.36,1);
+  --motion-ease-soft: cubic-bezier(.4,0,.2,1);
   font-family: -apple-system, BlinkMacSystemFont, "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
   color: var(--text);
   background: var(--background);
@@ -469,6 +474,132 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
 .skeleton--medium { width: 68%; }
 @keyframes shimmer { to { background-position: -220% 0; } }
 
+/* Motion system: short, directional transitions that preserve training-data readability. */
+.training-shell { view-transition-name: training-workspace; }
+.secondary-workspace { view-transition-name: secondary-workspace; }
+
+.view-tab,
+.period-nav__button,
+.period-nav__today,
+.week-day,
+.month-day,
+.refresh-button,
+.record-button,
+.secondary-tab,
+.exercise-card,
+.icon-button,
+.organize-button,
+.approve-button,
+.mic-button {
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    opacity var(--motion-fast) ease;
+}
+
+.connection__dot[data-state="idle"] { animation: apos-status-pulse 1.4s ease-in-out infinite; }
+.refresh-button:disabled { cursor: progress; opacity: .72; animation: apos-refresh-spin .82s linear infinite; }
+.mic-button[data-listening="true"] { animation: apos-recording-pulse 1.25s ease-in-out infinite; }
+
+.dashboard[data-motion="true"] .view-content > *,
+.dashboard[data-motion="true"] .secondary-content > * {
+  animation: apos-content-in var(--motion-slow) var(--motion-ease) both;
+}
+.dashboard[data-motion="true"] .day-menu-row,
+.dashboard[data-motion="true"] .week-day,
+.dashboard[data-motion="true"] .record-card,
+.dashboard[data-motion="true"] .metric-card {
+  animation: apos-card-in var(--motion-slow) var(--motion-ease) both;
+}
+.dashboard[data-motion="true"] .day-menu-row:nth-child(2),
+.dashboard[data-motion="true"] .week-day:nth-child(2),
+.dashboard[data-motion="true"] .card-list > *:nth-child(2) { animation-delay: 35ms; }
+.dashboard[data-motion="true"] .day-menu-row:nth-child(3),
+.dashboard[data-motion="true"] .week-day:nth-child(3),
+.dashboard[data-motion="true"] .card-list > *:nth-child(3) { animation-delay: 70ms; }
+.dashboard[data-motion="true"] .day-menu-row:nth-child(4),
+.dashboard[data-motion="true"] .week-day:nth-child(4),
+.dashboard[data-motion="true"] .card-list > *:nth-child(4) { animation-delay: 105ms; }
+.dashboard[data-motion="true"] .day-menu-row:nth-child(5),
+.dashboard[data-motion="true"] .week-day:nth-child(5) { animation-delay: 140ms; }
+.dashboard[data-motion="true"] .week-day:nth-child(6) { animation-delay: 175ms; }
+.dashboard[data-motion="true"] .week-day:nth-child(7) { animation-delay: 210ms; }
+.dashboard[data-motion="true"] .month-day:not(.month-day--empty) { animation: apos-month-in var(--motion-base) var(--motion-ease) both; }
+.dashboard[data-motion="true"] .intensity-track__fill { transform-origin: left center; animation: apos-bar-in 520ms var(--motion-ease) both; }
+.dashboard[data-motion="true"] .metric-sparkline__line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: apos-line-draw 760ms var(--motion-ease) 90ms forwards; }
+
+.exercise-dialog[open],
+.record-dialog[open] { animation: apos-dialog-in var(--motion-base) var(--motion-ease) both; }
+.exercise-dialog[open]::backdrop,
+.record-dialog[open]::backdrop { animation: apos-backdrop-in var(--motion-base) ease both; }
+
+@media (hover: hover) and (pointer: fine) {
+  .view-tab:hover,
+  .period-nav__button:hover,
+  .period-nav__today:hover,
+  .week-day:hover,
+  .month-day:hover,
+  .record-button:hover,
+  .secondary-tab:hover,
+  .exercise-card:hover,
+  .icon-button:hover,
+  .organize-button:hover,
+  .approve-button:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+    box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  }
+}
+
+::view-transition-group(training-workspace),
+::view-transition-group(secondary-workspace) {
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--motion-ease);
+}
+::view-transition-old(training-workspace),
+::view-transition-old(secondary-workspace) { animation: apos-view-out 190ms ease both; }
+::view-transition-new(training-workspace),
+::view-transition-new(secondary-workspace) { animation: apos-view-in var(--motion-slow) var(--motion-ease) both; }
+
+@keyframes apos-view-out {
+  to { opacity: 0; transform: translateY(-5px) scale(.995); filter: blur(1px); }
+}
+@keyframes apos-view-in {
+  from { opacity: 0; transform: translateY(8px) scale(.995); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes apos-content-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes apos-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes apos-month-in {
+  from { opacity: 0; transform: scale(.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes apos-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes apos-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes apos-bar-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes apos-line-draw { to { stroke-dashoffset: 0; } }
+@keyframes apos-refresh-spin { to { transform: rotate(360deg); } }
+@keyframes apos-status-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  50% { transform: scale(1.16); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 8%, transparent); }
+}
+@keyframes apos-recording-pulse {
+  0%, 100% { box-shadow: 0 0 0 7px rgba(255,86,86,.10); transform: scale(1); }
+  50% { box-shadow: 0 0 0 13px rgba(255,86,86,.04); transform: scale(1.035); }
+}
+
 @media (max-width: 820px) {
   .metric-grid { grid-template-columns: 1fr; }
 }
@@ -560,5 +691,11 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+  }
 }
