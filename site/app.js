@@ -71,13 +71,16 @@ async function boot() {
   await loadDashboardData();
 }
 
-async function loadDashboardData() {
-  showLoading();
+async function loadDashboardData({ fromLogin = false } = {}) {
+  const revealNotBefore = Date.now() + (fromLogin && !prefersReducedMotion() ? 900 : 0);
+  if (!fromLogin) showLoading();
   state.selectedDate = state.today;
   state.viewMode = "day";
   await loadDayData(state.today, { force: true, render: false });
   state.fetchedAt = new Date();
-  renderDashboard();
+  const remaining = revealNotBefore - Date.now();
+  if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+  renderDashboard({ motion: fromLogin });
   setConnection("ready", "今日を表示");
   void loadBackgroundData();
 }
@@ -214,6 +217,7 @@ function renderDashboard({ motion = false } = {}) {
     dashboard.replaceChildren();
     dashboard.append(renderTrainingWorkspace(), renderSecondaryWorkspace());
     dashboard.setAttribute("aria-busy", "false");
+    if (state.webSessionToken) document.body.dataset.authState = "ready";
   };
 
   if (motion && typeof document.startViewTransition === "function" && !prefersReducedMotion()) {
@@ -2105,11 +2109,14 @@ async function verifyWebSession() {
 function showLogin(message = "") {
   dashboard.replaceChildren();
   dashboard.setAttribute("aria-busy", "false");
+  document.body.dataset.authState = "login";
   setConnection("idle", "本人認証が必要");
   const panel = element("section", "panel panel--wide login-panel");
   const form = element("form", "login-form");
+  form.dataset.state = "idle";
+  const kicker = element("span", "login-kicker", "APOS / SECURE ACCESS");
   const title = element("h2", "", "本人認証");
-  const copy = element("p", "login-copy", "専用パスフレーズを入力してください。Face IDや自動入力で値が入ると、約0.1秒後に自動認証します。");
+  const copy = element("p", "login-copy", "認証情報を確認すると、自動的にパフォーマンス環境を開きます。Face ID・自動入力にも対応しています。");
   const label = element("label", "login-label", "パスフレーズ");
   label.htmlFor = "web-password";
   const input = element("input", "login-input");
@@ -2118,8 +2125,11 @@ function showLogin(message = "") {
   input.type = "password";
   input.autocomplete = "current-password";
   input.required = true;
-  const button = element("button", "login-button", "手動で認証");
+  const button = element("button", "login-button", "認証する");
   button.type = "submit";
+  const progress = element("div", "login-progress");
+  progress.setAttribute("aria-hidden", "true");
+  progress.append(element("span", "login-progress__line"));
   const status = element("p", "login-status", message);
   status.setAttribute("aria-live", "polite");
 
@@ -2129,13 +2139,6 @@ function showLogin(message = "") {
   let lastAttemptedPassword = "";
   let observedValue = "";
   let watchTimer = null;
-
-  const pulseAutoButton = () => {
-    button.classList.remove("login-button--auto-press");
-    void button.offsetWidth;
-    button.classList.add("login-button--auto-press");
-    setTimeout(() => button.classList.remove("login-button--auto-press"), 240);
-  };
 
   const scheduleAutoLogin = () => {
     clearTimeout(autoTimer);
@@ -2162,10 +2165,11 @@ function showLogin(message = "") {
     lastAttemptedPassword = password;
     authInFlight = true;
     queuedAuto = false;
+    form.dataset.state = "authenticating";
     button.disabled = true;
-    button.textContent = automatic ? "自動認証中…" : "認証中…";
-    if (automatic) pulseAutoButton();
-    else status.textContent = "";
+    button.textContent = automatic ? "認証しています" : "認証しています";
+    status.classList.remove("login-status--success");
+    status.textContent = automatic ? "認証情報を確認しています" : "";
 
     try {
       const result = await authRequest("/auth/login", { password: submittedPassword });
@@ -2175,14 +2179,21 @@ function showLogin(message = "") {
       state.webSessionToken = result.token;
       sessionStorage.setItem("aposWebSession", result.token);
       input.value = "";
-      setConnection("idle", "認証済み・読み込み中");
-      await loadDashboardData();
+      input.readOnly = true;
+      form.dataset.state = "success";
+      status.classList.add("login-status--success");
+      status.textContent = "認証完了。パフォーマンス環境を準備しています";
+      button.textContent = "認証完了";
+      setConnection("idle", "環境を準備中");
+      await loadDashboardData({ fromLogin: true });
     } catch (error) {
       if (input.value !== submittedPassword) return;
       if (error?.code === "WEB_AUTH_REQUIRED") {
         showLogin("セッションを確認できませんでした。もう一度認証してください。");
         return;
       }
+      form.dataset.state = "error";
+      status.classList.remove("login-status--success");
       if (!automatic) {
         status.textContent = error.message || "認証に失敗しました。";
         input.select();
@@ -2190,8 +2201,10 @@ function showLogin(message = "") {
     } finally {
       authInFlight = false;
       if (document.body.contains(button)) {
+        input.readOnly = false;
         button.disabled = false;
-        button.textContent = "手動で認証";
+        button.textContent = "認証する";
+        if (form.dataset.state !== "success") form.dataset.state = "idle";
       }
       if (queuedAuto && input.value && input.value !== lastAttemptedPassword) scheduleAutoLogin();
     }
@@ -2206,7 +2219,7 @@ function showLogin(message = "") {
 
   input.addEventListener("input", detectPasswordValue);
   input.addEventListener("change", detectPasswordValue);
-  form.append(title, copy, label, input, button, status);
+  form.append(kicker, title, copy, label, input, button, progress, status);
   form.addEventListener("submit", event => {
     event.preventDefault();
     clearTimeout(autoTimer);
@@ -2365,6 +2378,7 @@ async function refreshVisibleData() {
 }
 
 function showLoading() {
+  document.body.dataset.authState = state.webSessionToken ? "loading" : "login";
   dashboard.replaceChildren();
   const template = document.querySelector("#loading-template");
   for (let i = 0; i < 3; i++) dashboard.append(template.content.cloneNode(true));
