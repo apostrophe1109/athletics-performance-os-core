@@ -1,24 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_74a487d5757c4796bfff3f811847ad7a",
-  "generatedAt": "2026-08-21T03:21:15.532Z",
-  "baseCommitSha": "e7b486c07da2e5c4c3e06be22d05ff9f2f607d5f",
-  "changeReason": "承認済みPreviewのAPOS Viewアニメーション改善を反映する",
+  "deploymentId": "SITEDEPLOY_2fa5e18f692447699b5d0f292bf6b421",
+  "generatedAt": "2026-08-21T03:28:45.133Z",
+  "baseCommitSha": "ab760e612c7fefc0ccf9710c94755ec9aaff214f",
+  "changeReason": "承認済みPreviewのAPOS Viewモーション速度を約3倍へ延長して反映する",
   "files": [
-    {
-      "path": "site/app.js",
-      "operation": "UPSERT",
-      "contentHash": "1f0760a3806fcf250977fa61d2b4a1ce32577e1d29295702c524b05650afa7f0"
-    },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "eb29cc8883cad6c803a1a16c0bb4a1c613f6de671f70cfad95a961d837cb8f6b"
+      "contentHash": "fe0b51f7cc0211e72664a1879e9e26b8dbfde3fed66d794196a0dca4d3b5f3e9"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "e656661d9ff4942433f2c6e073465840f9552e6f6621a19db440f13c4dfcc31b"
+      "contentHash": "fb87e3008f54e64790fc9644aaa8c68a8d4d85b8f2e3a8d1695dac707ee78ceb"
     }
   ]
 }

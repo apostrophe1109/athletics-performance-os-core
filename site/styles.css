@@ -12,9 +12,9 @@
   --intensity-high: #ff6b6b;
   --line: rgba(255,255,255,.10);
   --radius: 22px;
-  --motion-fast: 160ms;
-  --motion-base: 280ms;
-  --motion-slow: 380ms;
+  --motion-fast: 480ms;
+  --motion-base: 840ms;
+  --motion-slow: 1140ms;
   --motion-ease: cubic-bezier(.22,1,.36,1);
   --motion-ease-soft: cubic-bezier(.4,0,.2,1);
   font-family: -apple-system, BlinkMacSystemFont, "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
@@ -474,7 +474,7 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
 .skeleton--medium { width: 68%; }
 @keyframes shimmer { to { background-position: -220% 0; } }
 
-/* Motion system: short, directional transitions that preserve training-data readability. */
+/* Motion system: slower, deliberate transitions that preserve training-data readability. */
 .training-shell { view-transition-name: training-workspace; }
 .secondary-workspace { view-transition-name: secondary-workspace; }
 
@@ -500,9 +500,9 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
     opacity var(--motion-fast) ease;
 }
 
-.connection__dot[data-state="idle"] { animation: apos-status-pulse 1.4s ease-in-out infinite; }
-.refresh-button:disabled { cursor: progress; opacity: .72; animation: apos-refresh-spin .82s linear infinite; }
-.mic-button[data-listening="true"] { animation: apos-recording-pulse 1.25s ease-in-out infinite; }
+.connection__dot[data-state="idle"] { animation: apos-status-pulse 4.2s ease-in-out infinite; }
+.refresh-button:disabled { cursor: progress; opacity: .72; animation: apos-refresh-spin 2.46s linear infinite; }
+.mic-button[data-listening="true"] { animation: apos-recording-pulse 3.75s ease-in-out infinite; }
 
 .dashboard[data-motion="true"] .view-content > *,
 .dashboard[data-motion="true"] .secondary-content > * {
@@ -516,20 +516,20 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
 }
 .dashboard[data-motion="true"] .day-menu-row:nth-child(2),
 .dashboard[data-motion="true"] .week-day:nth-child(2),
-.dashboard[data-motion="true"] .card-list > *:nth-child(2) { animation-delay: 35ms; }
+.dashboard[data-motion="true"] .card-list > *:nth-child(2) { animation-delay: 105ms; }
 .dashboard[data-motion="true"] .day-menu-row:nth-child(3),
 .dashboard[data-motion="true"] .week-day:nth-child(3),
-.dashboard[data-motion="true"] .card-list > *:nth-child(3) { animation-delay: 70ms; }
+.dashboard[data-motion="true"] .card-list > *:nth-child(3) { animation-delay: 210ms; }
 .dashboard[data-motion="true"] .day-menu-row:nth-child(4),
 .dashboard[data-motion="true"] .week-day:nth-child(4),
-.dashboard[data-motion="true"] .card-list > *:nth-child(4) { animation-delay: 105ms; }
+.dashboard[data-motion="true"] .card-list > *:nth-child(4) { animation-delay: 315ms; }
 .dashboard[data-motion="true"] .day-menu-row:nth-child(5),
-.dashboard[data-motion="true"] .week-day:nth-child(5) { animation-delay: 140ms; }
-.dashboard[data-motion="true"] .week-day:nth-child(6) { animation-delay: 175ms; }
-.dashboard[data-motion="true"] .week-day:nth-child(7) { animation-delay: 210ms; }
+.dashboard[data-motion="true"] .week-day:nth-child(5) { animation-delay: 420ms; }
+.dashboard[data-motion="true"] .week-day:nth-child(6) { animation-delay: 525ms; }
+.dashboard[data-motion="true"] .week-day:nth-child(7) { animation-delay: 630ms; }
 .dashboard[data-motion="true"] .month-day:not(.month-day--empty) { animation: apos-month-in var(--motion-base) var(--motion-ease) both; }
-.dashboard[data-motion="true"] .intensity-track__fill { transform-origin: left center; animation: apos-bar-in 520ms var(--motion-ease) both; }
-.dashboard[data-motion="true"] .metric-sparkline__line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: apos-line-draw 760ms var(--motion-ease) 90ms forwards; }
+.dashboard[data-motion="true"] .intensity-track__fill { transform-origin: left center; animation: apos-bar-in 1560ms var(--motion-ease) both; }
+.dashboard[data-motion="true"] .metric-sparkline__line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: apos-line-draw 2280ms var(--motion-ease) 270ms forwards; }
 
 .exercise-dialog[open],
 .record-dialog[open] { animation: apos-dialog-in var(--motion-base) var(--motion-ease) both; }
@@ -560,7 +560,7 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
   animation-timing-function: var(--motion-ease);
 }
 ::view-transition-old(training-workspace),
-::view-transition-old(secondary-workspace) { animation: apos-view-out 190ms ease both; }
+::view-transition-old(secondary-workspace) { animation: apos-view-out 570ms ease both; }
 ::view-transition-new(training-workspace),
 ::view-transition-new(secondary-workspace) { animation: apos-view-in var(--motion-slow) var(--motion-ease) both; }
 
