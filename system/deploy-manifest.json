@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_b5772f3f7491425aa88335404c93282c",
-  "generatedAt": "2026-08-24T05:21:23.280Z",
-  "baseCommitSha": "df34b09a2757d3bc9ffceef2223dac51b5007029",
-  "changeReason": "承認済みルール改訂を反映し、非破壊Canonical Data変更でも同一依頼内INLINE_APPROVALを有効化する",
+  "deploymentId": "SITEDEPLOY_c43c7c8003ca450db28f2f86a06415ed",
+  "generatedAt": "2026-08-24T06:49:18.356Z",
+  "baseCommitSha": "f498b989798a561d5d249d02d1bd9c678517337d",
+  "changeReason": "今後のAPOS応答でApproval HashとPreview期限を通常表示しない永続ルールを反映する。",
   "files": [
-    {
-      "path": "system/worker.js",
-      "operation": "UPSERT",
-      "contentHash": "266ec091fc65f74f482cda1396a4d5a3e58175c99992769745e95faed62db320"
-    },
     {
       "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "4bde66612505eeba2dfbf41e6cc36fe1d59a336e709d8df931ca6e08b80aa246"
-    },
-    {
-      "path": "system/contracts/APOS_Control_MyGPT_Instructions_v2.5.1.md",
-      "operation": "UPSERT",
-      "contentHash": "457db216c570c87e99205b76285957f996f85c2cca93bc06f62e1058a48a1170"
+      "contentHash": "df5230db9f3fe717f8c12f7b2085b974d415f89ef0c3de7518a0d43171f34e80"
     }
   ]
 }
