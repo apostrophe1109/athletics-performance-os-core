@@ -576,26 +576,26 @@ function groupHighSpeedConversionEntries(entries) {
       if (index >= source.length || !isHighSpeedConversionStart(source[index]?.title)) break;
     }
 
-    const setCount = highSpeedConversionSetCount(session, sequences.length);
-    const detailLines = sequences.map((sequence, sequenceIndex) => {
-      const rest = sequence.restAfter ? ` / ${sequence.restAfter}` : "";
-      return `${sequenceIndex + 1}セット目：${sequence.steps.join(" → ")}${rest}`;
-    });
+    const setCount = highSpeedConversionSetCount(session, sequences);
+    const rest = highSpeedConversionRest(session, sequences);
+    const normalizedSequences = sequences.map(sequence => sequence.steps.map(normalizeHighSpeedConversionStep));
+    const firstFlow = normalizedSequences[0]?.join(" → ") || "導入刺激 → 低振幅ポゴ → 20mダッシュ";
     const scores = groupedEntries
       .map(item => Number(item?.intensityScore))
       .filter(Number.isFinite);
 
     output.push({
       title: "高速変換コンプレックス",
-      detail: `${setCount}セット実施（導入刺激→低振幅ポゴ→20mダッシュまでで1セット）\n${detailLines.join("\n")}`,
+      detail: `合計${setCount}セット\n1セット＝${firstFlow}${setCount > 1 ? `（同じ流れを${setCount}回）` : ""}`,
       dose: `合計${setCount}セット`,
       section: "primer",
       intensityScore: scores.length ? Math.max(...scores) : resolvedTrainingIntensity("高速変換コンプレックス 20mダッシュ", session),
       intensityEstimated: false,
       exerciseId: null,
       session,
-      complexSteps: sequences.map(sequence => sequence.steps),
-      complexSetCount: setCount
+      complexSteps: normalizedSequences,
+      complexSetCount: setCount,
+      complexRest: rest
     });
   }
 
@@ -618,13 +618,43 @@ function isHighSpeedConversionRecovery(value) {
   return /^(?:完全回復)?\s*\d+(?:〜\d+)?分(?:完全)?(?:回復|休息)?$|^\d+(?:〜\d+)?分完全休息$/.test(String(value || "").trim());
 }
 
-function highSpeedConversionSetCount(session, sequenceCount) {
+function highSpeedConversionSetCount(session, sequences) {
+  const sequenceList = Array.isArray(sequences) ? sequences : [];
+  const sequenceCount = Math.max(1, sequenceList.length);
   const requirements = String(session?.requirements || "");
+  const explicitSet = requirements.match(/高速変換[^。\n]*?(\d+)セット/);
+  if (explicitSet) return Math.max(1, Number(explicitSet[1]));
+
+  const stepText = sequenceList.flatMap(sequence => sequence.steps || []).join(" ");
+  const embeddedSet = stepText.match(/×\s*1\s*を\s*(\d+)セット/);
+  if (embeddedSet) return Math.max(1, Number(embeddedSet[1]));
+
   const each = requirements.match(/各(\d+)ラウンド/);
   if (each && sequenceCount > 1) return Math.max(1, Number(each[1])) * sequenceCount;
   const single = requirements.match(/(\d+)ラウンド(?:のみ)?/);
   if (single && sequenceCount === 1) return Math.max(1, Number(single[1]));
-  return Math.max(1, sequenceCount);
+  return sequenceCount;
+}
+
+function highSpeedConversionRest(session, sequences) {
+  const texts = [
+    ...(Array.isArray(sequences) ? sequences.flatMap(sequence => [sequence.restAfter, ...(sequence.steps || [])]) : []),
+    session?.requirements,
+    session?.bridge
+  ].filter(Boolean).map(String);
+  for (const text of texts) {
+    const match = text.match(/(\d+(?:〜\d+)?)分(?:完全)?(?:回復|休息)/);
+    if (match) return `${match[1]}分完全回復`;
+  }
+  return "当日の指定どおり";
+}
+
+function normalizeHighSpeedConversionStep(value) {
+  return String(value || "")
+    .trim()
+    .replace(/×\s*1\s*を\s*\d+\s*セット/g, "×1")
+    .replace(/[（(]\s*\d+(?:〜\d+)?分(?:完全)?(?:回復|休息)\s*[）)]/g, "")
+    .trim();
 }
 
 function dayMenuDetailKey(item, index) {
@@ -675,6 +705,15 @@ async function toggleDayMenuDetail(key, item, score, toggle, detail, detailInner
 
 function renderDayMenuDetail(container, item, score, exercise, sprintBaselines = null) {
   container.replaceChildren();
+
+  if (Array.isArray(item?.complexSteps) && item.complexSteps.length) {
+    container.append(renderHighSpeedConversionTable(item, score));
+    appendDayMenuGuide(container, "狙い", exercise?.mainPurpose || dayMenuSectionPurpose(item.section));
+    appendDayMenuGuide(container, "意識するポイント", exercise?.cue || dayMenuSectionCue(item.section));
+    appendDayMenuGuide(container, "終了基準", exercise?.stopCondition || item.session?.stopCondition);
+    return;
+  }
+
   const facts = element("div", "day-menu-detail__facts");
   facts.append(
     dayMenuFact("強度", `${score}/10`),
@@ -694,6 +733,46 @@ function renderDayMenuDetail(container, item, score, exercise, sprintBaselines =
   appendDayMenuGuide(container, "避けること", exercise?.avoid);
   appendDayMenuGuide(container, "終了基準", exercise?.stopCondition || item.session?.stopCondition);
   appendDayMenuGuide(container, "三段跳への接続", exercise?.bridge);
+}
+
+function renderHighSpeedConversionTable(item, score) {
+  const section = element("section", "high-speed-complex");
+  const count = Math.max(1, Number(item.complexSetCount) || 1);
+  const sequence = item.complexSteps?.[0] || [];
+  const flow = sequence.join(" → ") || "導入刺激 → 低振幅ポゴ → 20mダッシュ";
+
+  const head = element("div", "high-speed-complex__head");
+  head.append(
+    element("h4", "", "高速変換｜セット構成"),
+    element("strong", "high-speed-complex__total", `合計 ${count}セット`)
+  );
+
+  const table = element("table", "high-speed-complex__table");
+  const body = document.createElement("tbody");
+  [
+    ["強度", `${score}/10`],
+    ["総セット数", `${count}セット`],
+    ["1セットの構成", flow],
+    ["繰り返し", count > 1 ? `上の1セットを${count}回実施` : "1回実施"],
+    ["セット間休息", item.complexRest || "当日の指定どおり"]
+  ].forEach(([label, value]) => {
+    const row = document.createElement("tr");
+    const th = document.createElement("th");
+    const td = document.createElement("td");
+    th.scope = "row";
+    th.textContent = label;
+    td.textContent = value;
+    row.append(th, td);
+    body.append(row);
+  });
+  table.append(body);
+
+  section.append(
+    head,
+    element("p", "high-speed-complex__definition", "20mダッシュ完了までで1セット。下の構成をセット数ぶん繰り返します。"),
+    table
+  );
+  return section;
 }
 
 function dayMenuFact(label, value) {

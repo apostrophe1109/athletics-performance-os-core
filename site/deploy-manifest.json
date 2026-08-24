@@ -1,24 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_2efe93e068ae4b77a1ef432a910d5a5f",
-  "generatedAt": "2026-08-21T05:25:54.084Z",
-  "baseCommitSha": "1a8fae373940bcd66a5ddaacaac37c1bff3ec648",
-  "changeReason": "承認済みPreviewのログイン完了後遷移とログイン画面の高級感改善を反映する",
+  "deploymentId": "SITEDEPLOY_26549ef1b15d4f6ba443edd784bbe8ea",
+  "generatedAt": "2026-08-24T04:42:58.258Z",
+  "baseCommitSha": "b7d325e84f49acd02cc2d7667852e852018b6b8b",
+  "changeReason": "承認済み高速変換コンプレックス表示改善を反映する",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "517bd4149b31e616ade7d87a80de656814710e19a323f5ddfefe00aba1457a7c"
+      "contentHash": "07b90172cd5f45576ef5e6730850586e4e7232b073e11fe920a8afbcdcbc4e6c"
     },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "1dbaae4afad7e97cd2f654463f9e9513c45e5680345392434eada45f08f671b8"
+      "contentHash": "ed26473ce2ddd29125f3f9838bc157347445d58dd60aeb36825693c45d0d9263"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "1599ba1bd500eb349b7176760a1948a2072a3986afca571106ff1225b8f6b5f1"
+      "contentHash": "4ea6675c4e9eacd51bc4745838ff328ae16ff8a228106531281a7d9ab8a2b72b"
     }
   ]
 }

@@ -205,6 +205,17 @@ button { -webkit-tap-highlight-color: transparent; }
 .day-menu-detail__fact { padding: 9px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.025); }
 .day-menu-detail__fact span { display: block; color: var(--muted); font-size: .58rem; }
 .day-menu-detail__fact strong { display: block; margin-top: 3px; color: var(--text); font-size: .68rem; line-height: 1.4; }
+.high-speed-complex { padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line)); border-radius: 13px; background: color-mix(in srgb, var(--accent) 4%, rgba(255,255,255,.018)); }
+.high-speed-complex__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.high-speed-complex__head h4 { margin: 0; color: var(--accent); font-size: .7rem; }
+.high-speed-complex__total { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; color: #071017; background: var(--accent); font-size: .68rem; font-weight: 950; }
+.high-speed-complex__definition { margin: 7px 0 0; color: var(--muted); font-size: .62rem; line-height: 1.55; }
+.high-speed-complex__table { width: 100%; margin-top: 9px; border-collapse: separate; border-spacing: 0 6px; table-layout: fixed; }
+.high-speed-complex__table th,
+.high-speed-complex__table td { padding: 9px 10px; vertical-align: top; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(0,0,0,.12); font-size: .68rem; line-height: 1.55; }
+.high-speed-complex__table th { width: 34%; color: var(--muted); text-align: left; font-weight: 780; border-left: 1px solid var(--line); border-radius: 9px 0 0 9px; }
+.high-speed-complex__table td { color: var(--text); font-weight: 780; overflow-wrap: anywhere; border-right: 1px solid var(--line); border-radius: 0 9px 9px 0; }
+.high-speed-complex__table tr:nth-child(2) td { color: var(--accent); font-size: .76rem; font-weight: 950; }
 .day-menu-detail__section { margin-top: 9px; padding: 10px 11px; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 8px; background: rgba(255,255,255,.02); }
 .day-menu-detail__section h4 { margin: 0; color: var(--accent); font-size: .65rem; }
 .day-menu-detail__section p { margin: 5px 0 0; color: var(--text); font-size: .7rem; line-height: 1.65; }
