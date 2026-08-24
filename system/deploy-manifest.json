@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_c43c7c8003ca450db28f2f86a06415ed",
-  "generatedAt": "2026-08-24T06:49:18.356Z",
-  "baseCommitSha": "f498b989798a561d5d249d02d1bd9c678517337d",
-  "changeReason": "今後のAPOS応答でApproval HashとPreview期限を通常表示しない永続ルールを反映する。",
+  "deploymentId": "SITEDEPLOY_c5f40305b68348c2a690e69da78166b0",
+  "generatedAt": "2026-08-24T22:47:09.830Z",
+  "baseCommitSha": "911973b856c93b7c5b6ea42502d18bcf82e783f6",
+  "changeReason": "承認済みMaintenance Previewと同一内容で、changeIdを通常応答から非表示とし完了報告の必須項目から外す",
   "files": [
     {
       "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "df5230db9f3fe717f8c12f7b2085b974d415f89ef0c3de7518a0d43171f34e80"
+      "contentHash": "29eb2f98ec856fd915b6ad70596d9e5afa1416b0d8ac7b67fb0a9deca26d5ec6"
+    },
+    {
+      "path": "system/contracts/APOS_Control_MyGPT_Instructions_v2.5.1.md",
+      "operation": "UPSERT",
+      "contentHash": "3c17ba93198c9764496515514f2db3dacd900723b69153212343f2287625e2ee"
     }
   ]
 }
