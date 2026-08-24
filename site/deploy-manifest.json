@@ -1,19 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_dff7ead6ad514cc1a17257dc6537ac73",
-  "generatedAt": "2026-08-24T05:30:03.157Z",
-  "baseCommitSha": "f07b8ccd95a650f1b0c018ff0e7e342d7d0a887e",
-  "changeReason": "承認不要の指示に基づき、ジャンプスクワットとフライングスプリットを各8/10で表示し休息文言による誤判定を修正する",
+  "deploymentId": "SITEDEPLOY_47b48616f6494d75838f525e89ff4eb3",
+  "generatedAt": "2026-08-24T05:39:22.123Z",
+  "baseCommitSha": "51779fc697812abdbdad954deb5fd261fc719510",
+  "changeReason": "本人指定により2026-08-24のジャンプスクワットとフライングスプリットだけを強度7/10でサイト表示し、明示強度を優先する",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "e74254dd458f2dc80df87fdbb8e36b50d70807dba5d927eff105f97e9adfa249"
+      "contentHash": "02adae6b33fdee5ee07fdac8622c410ff4164601d19e2b4cdf787189d8f7bce5"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "cf5688c8e2213f5c88aad188bd156531c6b6a566113a42e6efc668cfe0e67fd2"
+      "contentHash": "e56fced15aaa767d3d747b0f41a8c35fd47bccb7e5ecee446a52a680ec5e09aa"
     }
   ]
 }

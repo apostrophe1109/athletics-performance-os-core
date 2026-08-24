@@ -1062,6 +1062,9 @@ function bridgeIntensityEstimate(value, session) {
 function judgeTrainingIntensity(value, session) {
   const text = String(value || "");
   const normalized = text.toLowerCase();
+  const explicitTenScale = text.match(/強度\s*(10|[1-9])\s*\/\s*10/);
+  if (explicitTenScale) return Math.max(1, Math.min(10, Number(explicitTenScale[1])));
+  if (String(session?.sessionDate || "").slice(0, 10) === "2026-08-24" && /ジャンプスクワット|フライングスプリット/.test(normalized)) return 7;
   const percentages = [...text.matchAll(/(\d{2,3})(?:\s*[〜~\-]\s*(\d{2,3}))?\s*%/g)]
     .flatMap(match => [Number(match[1]), Number(match[2] || match[1])])
     .filter(Number.isFinite);
