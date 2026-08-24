@@ -1064,7 +1064,6 @@ function judgeTrainingIntensity(value, session) {
   const normalized = text.toLowerCase();
   const explicitTenScale = text.match(/強度\s*(10|[1-9])\s*\/\s*10/);
   if (explicitTenScale) return Math.max(1, Math.min(10, Number(explicitTenScale[1])));
-  if (String(session?.sessionDate || "").slice(0, 10) === "2026-08-24" && /ジャンプスクワット|フライングスプリット/.test(normalized)) return 7;
   const percentages = [...text.matchAll(/(\d{2,3})(?:\s*[〜~\-]\s*(\d{2,3}))?\s*%/g)]
     .flatMap(match => [Number(match[1]), Number(match[2] || match[1])])
     .filter(Number.isFinite);
@@ -1082,8 +1081,8 @@ function judgeTrainingIntensity(value, session) {
   const compoundRun = /^\(\s*\d{2,3}m(?:\s*\+\s*\d{2,3}m)+\s*\)×\d+set/i.test(text.trim());
   if (compoundRun) return Math.max(8, sessionIntensity(session) || 8);
   if (/アクティブレスト|active[\s_-]*rest/i.test(text)) return 2;
-  if (/ジャンプスクワット/.test(normalized)) return 8;
-  if (/フライングスプリット/.test(normalized)) return 8;
+  if (/ジャンプスクワット/.test(normalized)) return 7;
+  if (/フライングスプリット/.test(normalized)) return 7;
   if (/^\d+(?:〜\d+)?秒(?:休息)?$/.test(text.trim())) return 1;
   if (/^\d+(?:〜\d+)?分休息$/.test(text.trim())) return 1;
   if (/^(?:休息|rest|完全休養|完全休息)$/i.test(text.trim())) return 1;
