@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.20
+ * Version: 1.4.21
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.20";
+const VERSION = "1.4.21";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -908,6 +908,13 @@ async function previewSiteSourceChange(body, auth, env) {
   return {
     success: true,
     status: "AWAITING_EXPLICIT_APPROVAL",
+    approvalInteraction: {
+      previewExecutionRequired: true,
+      previewPresentationRequired: false,
+      inlineApprovalIntentSupported: siteSourceRoot(env) !== maintenanceSourceRoot(env) && !prepared.some(item => item.operation === "DELETE"),
+      inlineApprovalRequiresExactScope: true,
+      destructiveChangeRequiresSeparateApproval: true,
+    },
     previewId: lockedPreview.previewId,
     deploymentId,
     expiresAt: lockedPreview.expiresAt,
@@ -1366,6 +1373,9 @@ async function getMaintenanceCapabilities(env) {
     rules: {
       sourceChangesRequirePreview: true,
       applyRequiresExplicitApproval: true,
+      siteSourcePreviewPresentationRequired: false,
+      siteSourceInlineApprovalIntentSupported: true,
+      siteSourceInlineApprovalNonDestructiveOnly: true,
       approvalHashRequired: true,
       branchRaceProtection: true,
       fileHashRaceProtection: true,

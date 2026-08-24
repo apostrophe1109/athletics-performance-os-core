@@ -1,14 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e38f5c510708401fbb87a8c659416874",
-  "generatedAt": "2026-08-17T14:02:59.240Z",
-  "baseCommitSha": "8abd7ded5f0c5e507d1ab94fadfb4a4fe3818b77",
-  "changeReason": "承認済み開始時刻変更を完遂するため、startTime単項目UPDATEだけlockedPreviewを小型化するApps Script 1.2.4対応を反映する。",
+  "deploymentId": "SITEDEPLOY_4aac77d090e54d5a813cd51ab2910454",
+  "generatedAt": "2026-08-24T04:51:19.662Z",
+  "baseCommitSha": "b41080ef8b4f355cd4f221aee38b42f76dd51528",
+  "changeReason": "承認済みルール改訂を反映し、APOS Viewの非破壊変更でPreview表示省略と同一依頼内INLINE_APPROVALを有効化する",
   "files": [
     {
-      "path": "system/deploy_apps_script.py",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "07aba4b34a26db5d7e2bace912e010565dde01d5d0537fa51ed0b87872c03dba"
+      "contentHash": "aac16d486b4b561f43fa2119d1d3eb648e301f78006843919ec42aab3354bcc0"
+    },
+    {
+      "path": "system/runtime-policy.json",
+      "operation": "UPSERT",
+      "contentHash": "a78c0c43b3ebc22511282dd244bd91cd47e2cb77f0e89667f17a241b022d1407"
+    },
+    {
+      "path": "system/contracts/APOS_Control_MyGPT_Instructions_v2.5.1.md",
+      "operation": "UPSERT",
+      "contentHash": "4f26eba6029dafe04c10587947a3a41bbfa4516dfdfba4f1e94bfaceff1107e0"
     }
   ]
 }
