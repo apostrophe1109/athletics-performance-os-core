@@ -1079,9 +1079,11 @@ function judgeTrainingIntensity(value, session) {
   const compoundRun = /^\(\s*\d{2,3}m(?:\s*\+\s*\d{2,3}m)+\s*\)×\d+set/i.test(text.trim());
   if (compoundRun) return Math.max(8, sessionIntensity(session) || 8);
   if (/アクティブレスト|active[\s_-]*rest/i.test(text)) return 2;
+  if (/ジャンプスクワット/.test(normalized)) return 8;
+  if (/フライングスプリット/.test(normalized)) return 8;
   if (/^\d+(?:〜\d+)?秒(?:休息)?$/.test(text.trim())) return 1;
   if (/^\d+(?:〜\d+)?分休息$/.test(text.trim())) return 1;
-  if (/休息|rest|完全休養|完全休息/.test(normalized)) return 1;
+  if (/^(?:休息|rest|完全休養|完全休息)$/i.test(text.trim())) return 1;
   if (/クール|整理運動|静的ストレッチ|呼吸/.test(normalized)) return 1;
   if (/ウォーム|動的モビリティ|モビリティ|可動域|aマーチ|マーチ/.test(normalized)) return 2;
   if (/aスキップ|スキップ|低振幅ポゴ|ポゴ|ロープフロー|ドリル/.test(normalized)) return 3;
