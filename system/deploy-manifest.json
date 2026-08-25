@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_3553eaf6764440cd82cf23094330ad40",
-  "generatedAt": "2026-08-25T10:46:29.724Z",
-  "baseCommitSha": "3f664134688fcea9abb24fb3950a11cbf21a8995",
-  "changeReason": "承認済みPreviewと同一内容で、RepositoryのApps Script 1.2.4へ既存startTime安全修正を復元し本番1.2.4とのsource parityを成立させる",
+  "deploymentId": "SITEDEPLOY_0ae05dfe522f4d7ea4f9bbf27685dd25",
+  "generatedAt": "2026-08-25T10:51:11.161Z",
+  "baseCommitSha": "fbe3bc1e590ecc31ead543664c5ebda4b90d1a53",
+  "changeReason": "承認済み最終Previewと完全に同一の内容で、Repository Code.gsを本番Apps Script 1.2.5へ最終正規化する",
   "files": [
     {
       "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "6fa2384a93f0a0dd5fa707d9c163abd0234219c9b60a68c98e150d29b3f96a3a"
+      "contentHash": "fead4cf2dfa96383fb4e7b20c59aacf797a30a41bd1bfc1adc5aca48173dd392"
     }
   ]
 }

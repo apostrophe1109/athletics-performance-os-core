@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Google Apps Script API
- * Version: 1.2.4
+ * Version: 1.2.5
  * Target spreadsheet:
  *   1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw
  *
@@ -14,7 +14,7 @@
  */
 
 var APOS_CONFIG = Object.freeze({
-  API_VERSION: '1.2.4',
+  API_VERSION: '1.2.5',
   SCHEMA_VERSION: '1.1.0',
   SYSTEM_NAME: 'Athletics Performance OS',
   SPREADSHEET_ID: '1enh_Qt2rDr-r87PM06gvFCX_K1J4-i_eEuxl9fggFGw',
@@ -1281,6 +1281,7 @@ function APOS_syncIdLedger_(locked, actor) {
   if (!config.idType || !config.key) return null;
   if (['INSERT', 'ARCHIVE', 'DELETE'].indexOf(locked.actualOperation) === -1) return null;
   var found = APOS_findByKey_('idLedger', locked.key);
+  var previousLedgerStatus = found ? String(found.record.entityStatus || '').toUpperCase() : '';
   var now = APOS_today_();
   var record = found ? APOS_clone_(found.record) : {
     idType: config.idType, idValue: locked.key, canonicalId: locked.key, entitySheet: config.sheet,
@@ -1288,7 +1289,7 @@ function APOS_syncIdLedger_(locked, actor) {
     lastSeenAt: now, source: 'APOS_API', migrationNote: null
   };
   record.canonicalId = locked.key; record.entitySheet = config.sheet; record.lastSeenAt = now;
-  if (locked.actualOperation === 'INSERT') { record.entityStatus = 'ACTIVE'; record.reservationReason = locked.reservedIdRestoreAuthorized ? '承認済みRollbackにより復元' : 'APOS APIで新規作成'; }
+  if (locked.actualOperation === 'INSERT') { record.entityStatus = 'ACTIVE'; record.reservationReason = locked.reservedIdRestoreAuthorized ? '承認済みRollbackにより復元' : (previousLedgerStatus === 'RESERVED_LEGACY' ? '旧RESERVED_LEGACY番号を正式IDとして再利用' : 'APOS APIで新規作成'); }
   if (locked.actualOperation === 'ARCHIVE') { record.entityStatus = 'ARCHIVED'; record.reservationReason = '履歴保持・ID再利用禁止'; }
   if (locked.actualOperation === 'DELETE') { record.entityStatus = 'RESERVED_DELETED'; record.reservationReason = '削除後もID再利用禁止'; }
   if (found) return APOS_updateSystemRecord_('idLedger', locked.key, record);
@@ -1419,9 +1420,10 @@ function APOS_assertIdAvailableForInsert_(entity, key, options) {
   var ledger = APOS_findByKey_('idLedger', key);
   if (!ledger) return;
   var status = String(ledger.record.entityStatus || '').toUpperCase();
+  var legacyReuseAllowed = status === 'RESERVED_LEGACY';
   var restoreAllowed = options && options.allowReservedIdRestore === true && Boolean(options.rollbackOfChangeId) && status === 'RESERVED_DELETED';
-  if (!restoreAllowed) {
-    APOS_throw_('ID_REUSE_FORBIDDEN', 'ID台帳に存在するIDは再利用できません。', { entity: entity, key: key, ledgerStatus: status });
+  if (!legacyReuseAllowed && !restoreAllowed) {
+    APOS_throw_('ID_REUSE_FORBIDDEN', 'このIDは再利用できません。RESERVED_LEGACYのみ通常の新規登録で再利用できます。', { entity: entity, key: key, ledgerStatus: status });
   }
 }
 
