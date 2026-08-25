@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e045e6a3ea0c4ae0bc7e15547ee316f2",
-  "generatedAt": "2026-08-25T04:34:01.397Z",
-  "baseCommitSha": "dec9baa7876b9ceb4b2c2e8efaa5b7c37f8aea5f",
-  "changeReason": "承認済みMaintenance Previewと同一内容で、Maintenance Applyがworkflow対象の署名済みPreviewを正しいsourceRootで復元できるようWorkerを修正する",
+  "deploymentId": "SITEDEPLOY_74461a288ca746bba3d0755da6f19941",
+  "generatedAt": "2026-08-25T09:10:12.628Z",
+  "baseCommitSha": "1ff5ce430a3deadceee74a5618e6640fe9a9c92f",
+  "changeReason": "承認済み修正版Previewと同一内容で、Apps Script 1.2.5の安全な二段階デプロイ第1段階を反映する",
   "files": [
     {
-      "path": "system/worker.js",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "7d8a7207beb993d4b5957c373e19669fd500af0232dffded4da7288d7ba01ab1"
+      "contentHash": "35d27df08ba00a394801531ef576e7f48e29db16d58d3b9741c1ba975e65ccf6"
+    },
+    {
+      "path": "system/deploy_apps_script.py",
+      "operation": "UPSERT",
+      "contentHash": "81d77b271c45c77a33359adf12880e59b18e6fa69d9ef7fd484d3470f5c0f07d"
     }
   ]
 }

@@ -9,7 +9,7 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 def apply_approved_start_time_fix(source):
-    if " * Version: 1.2.4" in source and "APOS_isCompactSessionStartTimeLocked_" in source:
+    if (" * Version: 1.2.4" in source or " * Version: 1.2.5" in source) and "APOS_isCompactSessionStartTimeLocked_" in source:
         return source
     if " * Version: 1.2.3" in source and "changedCells: changedCells" in source:
         replacements_v124 = [
@@ -96,6 +96,34 @@ def apply_approved_start_time_fix(source):
         source = source.replace(find, replace, 1)
     return source
 
+def apply_approved_id_reuse_fix(source):
+    if " * Version: 1.2.5" in source and "legacyReuseAllowed = status === 'RESERVED_LEGACY'" in source:
+        return source
+    if " * Version: 1.2.4" not in source or "APOS_isCompactSessionStartTimeLocked_" not in source:
+        raise RuntimeError("Approved RESERVED_LEGACY reuse baseline 1.2.4 was not found; refusing deployment")
+    replacements = [
+        (" * Version: 1.2.4", " * Version: 1.2.5"),
+        ("  API_VERSION: '1.2.4',", "  API_VERSION: '1.2.5',"),
+        (
+            "function APOS_assertIdAvailableForInsert_(entity, key, options) {\n  var config = APOS_ENTITIES[entity];\n  if (!config.idType) return;\n  var ledger = APOS_findByKey_('idLedger', key);\n  if (!ledger) return;\n  var status = String(ledger.record.entityStatus || '').toUpperCase();\n  var restoreAllowed = options && options.allowReservedIdRestore === true && Boolean(options.rollbackOfChangeId) && status === 'RESERVED_DELETED';\n  if (!restoreAllowed) {\n    APOS_throw_('ID_REUSE_FORBIDDEN', 'ID台帳に存在するIDは再利用できません。', { entity: entity, key: key, ledgerStatus: status });\n  }\n}",
+            "function APOS_assertIdAvailableForInsert_(entity, key, options) {\n  var config = APOS_ENTITIES[entity];\n  if (!config.idType) return;\n  var ledger = APOS_findByKey_('idLedger', key);\n  if (!ledger) return;\n  var status = String(ledger.record.entityStatus || '').toUpperCase();\n  var legacyReuseAllowed = status === 'RESERVED_LEGACY';\n  var restoreAllowed = options && options.allowReservedIdRestore === true && Boolean(options.rollbackOfChangeId) && status === 'RESERVED_DELETED';\n  if (!legacyReuseAllowed && !restoreAllowed) {\n    APOS_throw_('ID_REUSE_FORBIDDEN', 'このIDは再利用できません。RESERVED_LEGACYのみ通常の新規登録で再利用できます。', { entity: entity, key: key, ledgerStatus: status });\n  }\n}",
+        ),
+        (
+            "  var found = APOS_findByKey_('idLedger', locked.key);\n  var now = APOS_today_();\n  var record = found ? APOS_clone_(found.record) : {",
+            "  var found = APOS_findByKey_('idLedger', locked.key);\n  var previousLedgerStatus = found ? String(found.record.entityStatus || '').toUpperCase() : '';\n  var now = APOS_today_();\n  var record = found ? APOS_clone_(found.record) : {",
+        ),
+        (
+            "  if (locked.actualOperation === 'INSERT') { record.entityStatus = 'ACTIVE'; record.reservationReason = locked.reservedIdRestoreAuthorized ? '承認済みRollbackにより復元' : 'APOS APIで新規作成'; }",
+            "  if (locked.actualOperation === 'INSERT') { record.entityStatus = 'ACTIVE'; record.reservationReason = locked.reservedIdRestoreAuthorized ? '承認済みRollbackにより復元' : (previousLedgerStatus === 'RESERVED_LEGACY' ? '旧RESERVED_LEGACY番号を正式IDとして再利用' : 'APOS APIで新規作成'); }",
+        ),
+    ]
+    for find, replace in replacements:
+        count = source.count(find)
+        if count != 1:
+            raise RuntimeError(f"Approved RESERVED_LEGACY reuse precondition mismatch: expected 1, actual {count}")
+        source = source.replace(find, replace, 1)
+    return source
+
 def required(name):
     value = os.environ.get(name, "").strip()
     if not value:
@@ -142,6 +170,7 @@ def main():
     source_path = os.environ.get("APOS_APPS_SCRIPT_SOURCE_PATH","system/apps-script/Code.gs")
     source = open(source_path, "r", encoding="utf-8").read()
     source = apply_approved_start_time_fix(source)
+    source = apply_approved_id_reuse_fix(source)
     expected_source_sha256 = sha256_text(source)
     token = oauth_access_token()
 
