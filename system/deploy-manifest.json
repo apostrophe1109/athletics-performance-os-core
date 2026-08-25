@@ -1,19 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_c5f40305b68348c2a690e69da78166b0",
-  "generatedAt": "2026-08-24T22:47:09.830Z",
-  "baseCommitSha": "911973b856c93b7c5b6ea42502d18bcf82e783f6",
-  "changeReason": "承認済みMaintenance Previewと同一内容で、changeIdを通常応答から非表示とし完了報告の必須項目から外す",
+  "deploymentId": "SITEDEPLOY_a22d211ae5ac4ecbadefd9be80eaf4ed",
+  "generatedAt": "2026-08-25T03:51:37.047Z",
+  "baseCommitSha": "b61644f8cc3871dff4c1c3da70b9d73270ade81d",
+  "changeReason": "承認済みMaintenance Previewと同一内容で、RESERVED_LEGACYの再利用禁止ルールを廃止し、3桁EX番号を最小連番から詰められるようにする",
   "files": [
+    {
+      "path": "system/apps-script/Code.gs",
+      "operation": "UPSERT",
+      "contentHash": "ca4e939505f5da9ed2e00e29692f42ce1ea73462adaeb41f11ab0593cab7a371"
+    },
     {
       "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "29eb2f98ec856fd915b6ad70596d9e5afa1416b0d8ac7b67fb0a9deca26d5ec6"
+      "contentHash": "54a6bc707f5573ea75b0a2583d5abe207c979bdaaa5b8d0b39b10dd64232f2d1"
     },
     {
       "path": "system/contracts/APOS_Control_MyGPT_Instructions_v2.5.1.md",
       "operation": "UPSERT",
-      "contentHash": "3c17ba93198c9764496515514f2db3dacd900723b69153212343f2287625e2ee"
+      "contentHash": "a3eb39879dc7bcef46e8c260cb169e6a2e6f18315eea122a03fb572394e83fef"
     }
   ]
 }

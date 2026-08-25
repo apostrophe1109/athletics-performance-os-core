@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "system": "Athletics Performance OS",
-  "policyVersion": "2026-08-25-r1",
+  "policyVersion": "2026-08-25-r2",
   "canonicalEntities": [
     "overview",
     "settings",
@@ -72,6 +72,12 @@
     "secretsInChat": false,
     "physicalDeleteDefault": false
   },
+  "idReusePolicy": {
+    "reservedLegacyReusable": true,
+    "archivedReusable": false,
+    "reservedDeletedReusable": false,
+    "rule": "旧移行データ由来のRESERVED_LEGACYは新しい正式IDとして再利用できる。現在の正式データをARCHIVEしたIDおよび削除後予約IDは再利用しない。3桁連番を詰める場合は未使用またはRESERVED_LEGACYの最小番号を優先する。"
+  },
   "payload": {
     "gptActionRequestResponseMaxChars": 100000,
     "contextBudgetBytes": 60000,
@@ -85,10 +91,10 @@
   ],
   "runtimeVersions": {
     "worker": "1.4.22",
-    "appsScriptApi": "1.2.1",
+    "appsScriptApi": "1.2.5",
     "canonicalSchema": "1.1.0",
     "openapi": "2.5.2",
-    "myGptInstructions": "2.5.5-compact-30-actions"
+    "myGptInstructions": "2.5.6-compact-30-actions"
   },
   "deployment": {
     "worker": "GitHub Actions -> cloudflare/wrangler-action@v3 -> Wrangler v4 -> Cloudflare Worker",
