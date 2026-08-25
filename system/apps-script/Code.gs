@@ -1080,6 +1080,26 @@ function APOS_prepareLockedMutation_(mutation, actor, options) {
   if (proposal && after && after.sportProfileId && String(after.sportProfileId) !== String(proposal.sportProfileId)) {
     APOS_throw_('PROPOSAL_SPORT_PROFILE_MISMATCH', '提案のsportProfileIdと変更対象が一致しません。');
   }
+  var compactStartTimeOnly = entity === 'sessions' && actualOperation === 'UPDATE';
+  if (compactStartTimeOnly) {
+    var suppliedChangeKeys = Object.keys(suppliedChanges).filter(function(field) { return field !== config.key; });
+    compactStartTimeOnly = suppliedChangeKeys.length === 1 && suppliedChangeKeys[0] === 'startTime';
+  }
+  if (compactStartTimeOnly) {
+    var compactFields = [config.key, 'sportProfileId', 'sessionDate', 'startTime', 'updatedAt'];
+    var compactBefore = {};
+    var compactAfter = {};
+    compactFields.forEach(function(field) {
+      if (before && Object.prototype.hasOwnProperty.call(before, field)) compactBefore[field] = before[field];
+      if (after && Object.prototype.hasOwnProperty.call(after, field)) compactAfter[field] = after[field];
+    });
+    before = compactBefore;
+    after = compactAfter;
+    if (proposal) {
+      proposal.beforeJson = APOS_clone_(compactBefore);
+      proposal.proposedJson = APOS_clone_(compactAfter);
+    }
+  }
   var now = new Date();
   var locked = {
     previewType: 'MUTATION', previewId: APOS_generateId_('PREVIEW'), requestedAt: now.toISOString(),
@@ -1147,7 +1167,7 @@ function APOS_applyOneLockedMutation_(locked, approval, actor, reversals, batchI
   var audit = {
     changeId: changeId, changedAt: APOS_nowIso_(), entityType: locked.entity, entityId: locked.key,
     effectiveDate: APOS_effectiveDateFromRecord_(locked.after || locked.before), operation: locked.actualOperation,
-    beforePayload: locked.before ? APOS_stableStringify_(locked.before) : null,
+    beforePayload: rowChange.beforeRecord ? APOS_stableStringify_(rowChange.beforeRecord) : (locked.before ? APOS_stableStringify_(locked.before) : null),
     afterPayload: rowChange.afterRecord ? APOS_stableStringify_(rowChange.afterRecord) : null,
     changeReason: approval.changeReason, proposedBy: locked.requestedBy, approvedBy: approval.approvedBy,
     approvedAt: approval.approvedAt, relatedProposalId: proposalId, result: 'APPLIED', method: 'APOS_API', executor: actor,
@@ -1159,13 +1179,26 @@ function APOS_applyOneLockedMutation_(locked, approval, actor, reversals, batchI
   return { changeId: changeId, proposalId: proposalId, entity: locked.entity, entityId: locked.key, operation: locked.actualOperation, afterRecord: rowChange.afterRecord || null };
 }
 
+function APOS_isCompactSessionStartTimeLocked_(locked) {
+  if (!locked || locked.entity !== 'sessions' || locked.actualOperation !== 'UPDATE' || !locked.before || !locked.after) return false;
+  var allowed = { sessionId: true, sportProfileId: true, sessionDate: true, startTime: true, updatedAt: true };
+  var beforeKeys = Object.keys(locked.before);
+  var afterKeys = Object.keys(locked.after);
+  if (!Object.prototype.hasOwnProperty.call(locked.after, 'startTime')) return false;
+  return beforeKeys.length <= 5 && afterKeys.length <= 5 &&
+    beforeKeys.every(function(key) { return allowed[key] === true; }) &&
+    afterKeys.every(function(key) { return allowed[key] === true; });
+}
+
 function APOS_executeRowMutation_(locked, approval) {
   var entity = locked.entity;
   var config = APOS_ENTITIES[entity];
   var sheet = APOS_sheet_(config.sheet);
   var headers = APOS_headers_(sheet);
   var found = APOS_findByKey_(entity, locked.key);
-  var afterRecord = locked.after ? APOS_clone_(locked.after) : null;
+  var compactStartTimeUpdate = APOS_isCompactSessionStartTimeLocked_(locked);
+  var currentBeforeRecord = found ? APOS_clone_(found.record) : null;
+  var afterRecord = locked.after ? (compactStartTimeUpdate ? APOS_merge_(currentBeforeRecord, locked.after) : APOS_clone_(locked.after)) : null;
   if (afterRecord) {
     if (headers.indexOf('approvalStatus') !== -1) afterRecord.approvalStatus = 'APPROVED';
     if (headers.indexOf('approvedBy') !== -1) afterRecord.approvedBy = approval.approvedBy;
@@ -1173,7 +1206,7 @@ function APOS_executeRowMutation_(locked, approval) {
     if (headers.indexOf('proposalId') !== -1 && locked.proposal) afterRecord.proposalId = locked.proposal.proposalId;
     if (headers.indexOf('previewStatus') !== -1) afterRecord.previewStatus = 'CONFIRMED';
     if (headers.indexOf('recordedAt') !== -1 && !afterRecord.recordedAt) afterRecord.recordedAt = APOS_nowIso_();
-    APOS_validateRecord_(entity, afterRecord, { operation: locked.actualOperation, before: locked.before });
+    APOS_validateRecord_(entity, afterRecord, { operation: locked.actualOperation, before: compactStartTimeUpdate ? currentBeforeRecord : locked.before });
     afterRecord = APOS_normalizeRecordForStorage_(entity, afterRecord, headers);
   }
   if (locked.actualOperation === 'INSERT') {
@@ -1191,13 +1224,14 @@ function APOS_executeRowMutation_(locked, approval) {
     return { kind: 'DELETE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: oldRow, afterRow: null, afterRecord: null };
   }
   var beforeRow = sheet.getRange(found.rowNumber, 1, 1, headers.length).getValues()[0];
-  var beforeExpectedRow = APOS_recordToRow_(entity, locked.before, headers);
+  var comparisonBeforeRecord = compactStartTimeUpdate ? currentBeforeRecord : locked.before;
+  var beforeExpectedRow = APOS_recordToRow_(entity, comparisonBeforeRecord, headers);
   var afterRow = APOS_recordToRow_(entity, afterRecord, headers);
   var changedCells = [];
   APOS_prepareStorageFormats_(sheet, found.rowNumber, headers, entity);
   for (var col = 0; col < headers.length; col++) {
     var field = headers[col];
-    var beforeValue = locked.before ? locked.before[field] : null;
+    var beforeValue = comparisonBeforeRecord ? comparisonBeforeRecord[field] : null;
     var afterValue = afterRecord ? afterRecord[field] : null;
     if (APOS_stableStringify_(beforeValue) === APOS_stableStringify_(afterValue)) continue;
     changedCells.push({ column: col + 1, beforeValue: beforeExpectedRow[col], afterValue: afterRow[col] });
@@ -1215,7 +1249,7 @@ function APOS_executeRowMutation_(locked, approval) {
     }
     throw error;
   }
-  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, afterRecord: afterRecord };
+  return { kind: 'UPDATE', sheetName: config.sheet, rowNumber: found.rowNumber, beforeRow: beforeRow, afterRow: afterRow, changedCells: changedCells, beforeRecord: currentBeforeRecord, afterRecord: afterRecord };
 }
 
 function APOS_prepareStorageFormats_(sheet, rowNumber, headers, entity) {
