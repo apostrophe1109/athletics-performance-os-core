@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.22
+ * Version: 1.4.23
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.22";
+const VERSION = "1.4.23";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 25000;
@@ -1782,8 +1782,14 @@ async function maintenanceApply(body, auth, env) {
   if (!MAINTENANCE_APPLY_OPERATIONS.has(operation)) {
     throw Object.assign(new Error("maintenanceApplyのoperationが未対応です。getMaintenanceCapabilitiesで確認してください。"), { code: "MAINTENANCE_OPERATION_UNSUPPORTED", status: 400 });
   }
-  const payload = isPlainObject(body.payload) ? body.payload : {};
-  const scopedEnv = maintenanceChangeEnv(payload, env);
+  const payload = isPlainObject(body.payload) ? { ...body.payload } : {};
+  let scopedEnv = maintenanceChangeEnv(payload, env);
+  if (operation === "SYSTEM_SOURCE_CHANGE" && payload.lockedPreviewToken && !payload.lockedPreview) {
+    const resolved = await resolveLockedPreview(payload, "SITE_SOURCE", env);
+    payload.lockedPreview = resolved.locked;
+    delete payload.lockedPreviewToken;
+    scopedEnv = maintenanceChangeEnv(payload, env);
+  }
   let result;
   if (operation === "SYSTEM_SOURCE_CHANGE") result = await applySiteSourceChange(payload, auth, scopedEnv);
   else result = await applySiteSourceRollback(payload, auth, scopedEnv);
