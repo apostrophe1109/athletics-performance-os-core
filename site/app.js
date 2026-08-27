@@ -72,7 +72,7 @@ async function boot() {
 }
 
 async function loadDashboardData({ fromLogin = false } = {}) {
-  const revealNotBefore = Date.now() + (fromLogin && !prefersReducedMotion() ? 1250 : 0);
+  const revealNotBefore = Date.now() + (fromLogin && !prefersReducedMotion() ? 1650 : 0);
   if (!fromLogin) showLoading();
   state.selectedDate = state.today;
   state.viewMode = "day";
@@ -2236,22 +2236,52 @@ function showLogin(message = "") {
 
   const launch = element("div", "login-launch");
   launch.setAttribute("aria-hidden", "true");
+
+  const launchScene = element("div", "login-launch__scene");
+  launchScene.append(
+    element("span", "login-launch__ghost", "APOS"),
+    element("span", "login-launch__grid"),
+    element("span", "login-launch__gate login-launch__gate--left"),
+    element("span", "login-launch__gate login-launch__gate--right"),
+    element("span", "login-launch__beam login-launch__beam--a"),
+    element("span", "login-launch__beam login-launch__beam--b"),
+    element("span", "login-launch__beam login-launch__beam--c"),
+    element("span", "login-launch__hud login-launch__hud--tl", "LINK / SECURE"),
+    element("span", "login-launch__hud login-launch__hud--tr", "CORE / ONLINE"),
+    element("span", "login-launch__hud login-launch__hud--bl", "SYNC / ACTIVE"),
+    element("span", "login-launch__hud login-launch__hud--br", "VIEW / READY")
+  );
+  const particles = element("div", "login-launch__particles");
+  for (let i = 1; i <= 10; i += 1) particles.append(element("span", `login-launch__particle login-launch__particle--${i}`));
+  launchScene.append(particles);
+
   const launchCore = element("div", "login-launch__core");
   launchCore.append(
+    element("span", "login-launch__dial"),
     element("span", "login-launch__ring login-launch__ring--outer"),
     element("span", "login-launch__ring login-launch__ring--inner"),
+    element("span", "login-launch__orbit"),
+    element("span", "login-launch__orbit-dot"),
     element("span", "login-launch__pulse"),
     element("strong", "login-launch__mark", "APOS")
   );
   const launchCopy = element("div", "login-launch__copy");
   launchCopy.append(
     element("span", "login-launch__eyebrow", "SECURE SESSION ESTABLISHED"),
-    element("strong", "login-launch__title", "PERFORMANCE ENVIRONMENT"),
+    element("strong", "login-launch__title", "ATHLETICS PERFORMANCE OS"),
     element("span", "login-launch__step login-launch__step--1", "AUTH / VERIFIED"),
-    element("span", "login-launch__step login-launch__step--2", "DATA / SYNCHRONIZING"),
-    element("span", "login-launch__step login-launch__step--3", "WORKSPACE / READY")
+    element("span", "login-launch__step login-launch__step--2", "PERFORMANCE DATA / SYNCHRONIZED"),
+    element("span", "login-launch__step login-launch__step--3", "MOTION CORE / ONLINE"),
+    element("span", "login-launch__step login-launch__step--4", "WORKSPACE / READY")
   );
-  launch.append(element("span", "login-launch__scan"), launchCore, launchCopy);
+  const telemetry = element("div", "login-launch__telemetry");
+  telemetry.append(
+    element("span", "", "01 / AUTH"),
+    element("span", "", "02 / DATA"),
+    element("span", "", "03 / MOTION"),
+    element("span", "", "04 / VIEW")
+  );
+  launch.append(launchScene, launchCore, launchCopy, telemetry);
 
   let autoTimer = null;
   let authInFlight = false;

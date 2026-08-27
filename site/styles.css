@@ -618,6 +618,96 @@ body[data-auth-state="ready"] .topbar-actions { opacity: 1; transition: opacity 
 @keyframes apos-launch-pulse { 0% { transform: scale(.3); opacity: 0; } 28% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 45%, transparent); } 100% { transform: scale(.75); opacity: .15; box-shadow: 0 0 0 42px transparent, 0 0 10px transparent; } }
 @keyframes apos-launch-step { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
+/* APOS launch sequence v2: layered, playful, lightweight. */
+.login-panel[data-transition="launch"] .login-launch {
+  opacity: 1;
+  transform: none;
+  animation: apos-launch-v2-in 420ms var(--motion-ease) both;
+}
+.login-launch__scene { position: absolute; inset: 0; overflow: hidden; perspective: 700px; pointer-events: none; }
+.login-launch__ghost {
+  position: absolute; inset: 50% auto auto 50%;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  font-size: clamp(7rem, 24vw, 17rem); font-weight: 950; letter-spacing: -.08em;
+  opacity: 0; transform: translate(-50%, -50%) scale(.58); filter: blur(5px);
+}
+.login-panel[data-transition="launch"] .login-launch__ghost { animation: apos-launch-ghost 1500ms cubic-bezier(.16,.84,.2,1) 80ms both; }
+.login-launch__grid {
+  position: absolute; left: -20%; right: -20%; bottom: -44%; height: 78%;
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent) 1px, transparent 1px);
+  background-size: 34px 34px;
+  transform: rotateX(68deg) translateY(26%) scale(1.45); transform-origin: center bottom;
+  opacity: 0; mask-image: linear-gradient(to top, #000 20%, transparent 86%);
+}
+.login-panel[data-transition="launch"] .login-launch__grid { animation: apos-launch-grid 1500ms linear 100ms both; }
+.login-launch__gate { position: absolute; top: 0; bottom: 0; width: 51%; background: linear-gradient(90deg, rgba(2,7,11,.97), rgba(4,13,19,.84)); box-shadow: 0 0 80px rgba(0,0,0,.5); }
+.login-launch__gate--left { left: 0; transform-origin: left center; }
+.login-launch__gate--right { right: 0; transform-origin: right center; background: linear-gradient(270deg, rgba(2,7,11,.97), rgba(4,13,19,.84)); }
+.login-panel[data-transition="launch"] .login-launch__gate--left { animation: apos-launch-gate-left 920ms var(--motion-ease) 250ms both; }
+.login-panel[data-transition="launch"] .login-launch__gate--right { animation: apos-launch-gate-right 920ms var(--motion-ease) 250ms both; }
+.login-launch__beam { position: absolute; width: 2px; height: 140%; top: -20%; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 82%, white 10%), transparent); opacity: 0; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 70%, transparent)); transform: rotate(18deg); }
+.login-launch__beam--a { left: 18%; }
+.login-launch__beam--b { left: 52%; transform: rotate(-12deg); }
+.login-launch__beam--c { left: 82%; transform: rotate(24deg); }
+.login-panel[data-transition="launch"] .login-launch__beam--a { animation: apos-launch-beam 820ms ease 160ms both; }
+.login-panel[data-transition="launch"] .login-launch__beam--b { animation: apos-launch-beam 920ms ease 360ms both; }
+.login-panel[data-transition="launch"] .login-launch__beam--c { animation: apos-launch-beam 780ms ease 560ms both; }
+.login-launch__hud { position: absolute; color: color-mix(in srgb, var(--muted) 74%, var(--accent)); font-size: .48rem; font-weight: 850; letter-spacing: .18em; opacity: 0; }
+.login-launch__hud::before { content: ""; display: inline-block; width: 14px; height: 1px; margin-right: 7px; vertical-align: middle; background: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent); }
+.login-launch__hud--tl { top: 9%; left: 7%; }
+.login-launch__hud--tr { top: 9%; right: 7%; }
+.login-launch__hud--bl { bottom: 9%; left: 7%; }
+.login-launch__hud--br { right: 7%; bottom: 9%; }
+.login-panel[data-transition="launch"] .login-launch__hud { animation: apos-launch-hud 360ms ease 720ms forwards; }
+.login-launch__particles { position: absolute; inset: 0; }
+.login-launch__particle { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); opacity: 0; }
+.login-launch__particle--1 { left: 12%; top: 36%; } .login-launch__particle--2 { left: 22%; top: 68%; } .login-launch__particle--3 { left: 34%; top: 18%; } .login-launch__particle--4 { left: 43%; top: 76%; } .login-launch__particle--5 { left: 56%; top: 24%; } .login-launch__particle--6 { left: 64%; top: 70%; } .login-launch__particle--7 { left: 73%; top: 34%; } .login-launch__particle--8 { left: 86%; top: 58%; } .login-launch__particle--9 { left: 17%; top: 52%; } .login-launch__particle--10 { left: 79%; top: 18%; }
+.login-panel[data-transition="launch"] .login-launch__particle { animation: apos-launch-particle 900ms ease-out 420ms both; }
+.login-panel[data-transition="launch"] .login-launch__particle:nth-child(2n) { animation-delay: 560ms; }
+.login-panel[data-transition="launch"] .login-launch__particle:nth-child(3n) { animation-delay: 700ms; }
+.login-launch__core { z-index: 4; }
+.login-launch__dial { position: absolute; inset: -14px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--accent) 58%, transparent) 0 1deg, transparent 1deg 8deg); mask: radial-gradient(circle, transparent 64%, #000 66% 70%, transparent 72%); opacity: .2; }
+.login-launch__orbit { position: absolute; inset: -28px; border: 1px dashed color-mix(in srgb, var(--accent-2) 24%, transparent); border-radius: 50%; opacity: .38; }
+.login-launch__orbit-dot { position: absolute; width: 6px; height: 6px; top: -30px; left: calc(50% - 3px); border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 14px var(--accent-2); transform-origin: 3px 89px; }
+.login-panel[data-transition="launch"] .login-launch__dial { animation: apos-launch-dial 4.5s linear infinite; }
+.login-panel[data-transition="launch"] .login-launch__orbit { animation: apos-launch-orbit 5.5s linear infinite reverse; }
+.login-panel[data-transition="launch"] .login-launch__orbit-dot { animation: apos-launch-orbit-dot 2.1s linear infinite; }
+.login-panel[data-transition="launch"] .login-launch__ring--outer { animation: apos-launch-ring-v2 1350ms cubic-bezier(.15,.85,.2,1) both; }
+.login-panel[data-transition="launch"] .login-launch__ring--inner { animation: apos-launch-ring-v2-inner 1350ms cubic-bezier(.15,.85,.2,1) both; }
+.login-panel[data-transition="launch"] .login-launch__pulse { animation: apos-launch-pulse-v2 1100ms ease-out both; }
+.login-launch__copy { z-index: 4; gap: 4px; }
+.login-launch__eyebrow { text-shadow: 0 0 16px color-mix(in srgb, var(--accent) 38%, transparent); }
+.login-launch__title { font-size: clamp(.95rem, 3.2vw, 1.22rem); letter-spacing: .14em; }
+.login-panel[data-transition="launch"] .login-launch__step--1 { animation-delay: 260ms; }
+.login-panel[data-transition="launch"] .login-launch__step--2 { animation-delay: 500ms; }
+.login-panel[data-transition="launch"] .login-launch__step--3 { animation-delay: 760ms; color: var(--accent); }
+.login-panel[data-transition="launch"] .login-launch__step--4 { animation: apos-launch-step 240ms ease 1040ms forwards; color: var(--accent-2); }
+.login-launch__telemetry { position: absolute; left: 50%; bottom: 5%; z-index: 4; width: min(520px, 78%); display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; transform: translateX(-50%); opacity: 0; }
+.login-launch__telemetry span { padding: 7px 8px; color: color-mix(in srgb, var(--muted) 84%, var(--accent)); border-top: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); font-size: .46rem; font-weight: 800; letter-spacing: .12em; text-align: center; }
+.login-panel[data-transition="launch"] .login-launch__telemetry { animation: apos-launch-telemetry 460ms ease 920ms forwards; }
+.dashboard[data-motion="true"] { position: relative; }
+.dashboard[data-motion="true"]::before { content: ""; position: fixed; inset: 0; z-index: 999; pointer-events: none; background: radial-gradient(circle at 50% 44%, rgba(255,255,255,.86), color-mix(in srgb, var(--accent) 36%, transparent) 18%, transparent 58%); opacity: 0; animation: apos-workspace-flash 760ms ease-out both; }
+.dashboard[data-motion="true"] .training-shell { animation: apos-workspace-arrive 980ms cubic-bezier(.16,.86,.18,1) both; }
+
+@keyframes apos-launch-v2-in { from { opacity: 0; transform: scale(1.035); filter: blur(7px); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
+@keyframes apos-launch-ghost { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.58); filter: blur(6px); } 28% { opacity: .22; } 70% { opacity: .08; } 100% { opacity: .03; transform: translate(-50%,-50%) scale(1.18); filter: blur(0); } }
+@keyframes apos-launch-grid { 0% { opacity: 0; transform: rotateX(68deg) translateY(32%) scale(1.7); background-position: 0 0; } 25% { opacity: .46; } 100% { opacity: .18; transform: rotateX(68deg) translateY(6%) scale(1.35); background-position: 0 68px; } }
+@keyframes apos-launch-gate-left { 0% { transform: translateX(0); } 100% { transform: translateX(-104%); } }
+@keyframes apos-launch-gate-right { 0% { transform: translateX(0); } 100% { transform: translateX(104%); } }
+@keyframes apos-launch-beam { 0% { opacity: 0; transform: translateX(-160px) rotate(18deg); } 24% { opacity: .9; } 100% { opacity: 0; transform: translateX(320px) rotate(18deg); } }
+@keyframes apos-launch-hud { from { opacity: 0; transform: translateY(5px); } to { opacity: .72; transform: translateY(0); } }
+@keyframes apos-launch-particle { 0% { opacity: 0; transform: scale(.3) translateY(12px); } 35% { opacity: .85; } 100% { opacity: .08; transform: scale(1.5) translateY(-28px); } }
+@keyframes apos-launch-dial { to { transform: rotate(360deg); } }
+@keyframes apos-launch-orbit { to { transform: rotate(360deg); } }
+@keyframes apos-launch-orbit-dot { to { transform: rotate(360deg); } }
+@keyframes apos-launch-ring-v2 { 0% { transform: scale(.42) rotate(-120deg); opacity: 0; } 34% { opacity: 1; } 74% { transform: scale(1.12) rotate(225deg); opacity: .54; } 100% { transform: scale(1) rotate(270deg); opacity: .34; } }
+@keyframes apos-launch-ring-v2-inner { 0% { transform: scale(.3) rotate(140deg); opacity: 0; } 42% { opacity: 1; } 100% { transform: scale(1) rotate(-220deg); opacity: .42; } }
+@keyframes apos-launch-pulse-v2 { 0% { transform: scale(.18); opacity: 0; } 34% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 48%, transparent), 0 0 36px color-mix(in srgb, var(--accent) 72%, transparent); } 100% { transform: scale(.76); opacity: .5; box-shadow: 0 0 0 58px transparent, 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent); } }
+@keyframes apos-launch-telemetry { from { opacity: 0; transform: translate(-50%, 7px); } to { opacity: .72; transform: translate(-50%, 0); } }
+@keyframes apos-workspace-flash { 0% { opacity: .95; transform: scale(.7); } 30% { opacity: .22; } 100% { opacity: 0; transform: scale(1.25); } }
+@keyframes apos-workspace-arrive { from { opacity: 0; transform: translateY(18px) scale(.975); filter: blur(7px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
+
 .skeleton-panel { min-height: 160px; display: grid; gap: 13px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .skeleton { height: 16px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.13), rgba(255,255,255,.05)); background-size: 220% 100%; animation: shimmer 1.4s infinite; }
 .skeleton--short { width: 32%; }
@@ -843,8 +933,13 @@ body[data-auth-state="ready"] .topbar-actions { opacity: 1; transition: opacity 
   .login-panel { min-height: calc(100dvh - 92px); border-radius: 18px; }
   .login-form { padding: 26px 20px 24px; border-radius: 22px; }
   .login-copy { font-size: .78rem; line-height: 1.72; }
-  .login-launch { gap: 22px; padding: 20px; }
-  .login-launch__core { width: 104px; }
+  .login-launch { gap: 18px; padding: 18px; }
+  .login-launch__core { width: 102px; }
+  .login-launch__hud { display: none; }
+  .login-launch__telemetry { width: 90%; bottom: 3.5%; }
+  .login-launch__telemetry span { padding: 6px 3px; font-size: .4rem; letter-spacing: .06em; }
+  .login-launch__ghost { font-size: clamp(6rem, 32vw, 10rem); }
+  .login-launch__grid { background-size: 26px 26px; }
 }
 
 
