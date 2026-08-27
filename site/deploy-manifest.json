@@ -1,14 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_a836572123e34b15a8ab0b4498b6a840",
-  "generatedAt": "2026-08-27T04:47:52.549Z",
-  "baseCommitSha": "b1e876f9f61454d0e15eae7cc6269a9f6446dcc1",
-  "changeReason": "設定タイムの明示設計値をAPOS Viewで優先表示する変更を本人の明示承認に基づき反映する。",
+  "deploymentId": "SITEDEPLOY_99ee25f4e85e49078eabcc61004c6b57",
+  "generatedAt": "2026-08-27T22:43:57.501Z",
+  "baseCommitSha": "7bddfe47fa45ade5d730de4fcf9e1e0a3d8d7386",
+  "changeReason": "承認済みのログイン遷移アニメーションを、認証処理を変更せずAPOS Viewへ反映する",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "e2aa7d93eedd455ff8d97ff0ca3f5cde7a2aeb229c3225c0ff800f9a2713440f"
+      "contentHash": "bae21fb27e965caa0518f2d27541d60f977808a5d2b419161e151a53d58850e2"
+    },
+    {
+      "path": "site/styles.css",
+      "operation": "UPSERT",
+      "contentHash": "f6461b87576a16f9c4ef4cddfb40aa6e94ef90cb865c4d61b21703965d03fdc7"
+    },
+    {
+      "path": "site/index.html",
+      "operation": "UPSERT",
+      "contentHash": "5b1d7585290775cf76cd3233abc3afb2f6586b41c93cde97defb95251e19b2a0"
     }
   ]
 }

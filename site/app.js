@@ -72,7 +72,7 @@ async function boot() {
 }
 
 async function loadDashboardData({ fromLogin = false } = {}) {
-  const revealNotBefore = Date.now() + (fromLogin && !prefersReducedMotion() ? 900 : 0);
+  const revealNotBefore = Date.now() + (fromLogin && !prefersReducedMotion() ? 1250 : 0);
   if (!fromLogin) showLoading();
   state.selectedDate = state.today;
   state.viewMode = "day";
@@ -2234,6 +2234,25 @@ function showLogin(message = "") {
   const status = element("p", "login-status", message);
   status.setAttribute("aria-live", "polite");
 
+  const launch = element("div", "login-launch");
+  launch.setAttribute("aria-hidden", "true");
+  const launchCore = element("div", "login-launch__core");
+  launchCore.append(
+    element("span", "login-launch__ring login-launch__ring--outer"),
+    element("span", "login-launch__ring login-launch__ring--inner"),
+    element("span", "login-launch__pulse"),
+    element("strong", "login-launch__mark", "APOS")
+  );
+  const launchCopy = element("div", "login-launch__copy");
+  launchCopy.append(
+    element("span", "login-launch__eyebrow", "SECURE SESSION ESTABLISHED"),
+    element("strong", "login-launch__title", "PERFORMANCE ENVIRONMENT"),
+    element("span", "login-launch__step login-launch__step--1", "AUTH / VERIFIED"),
+    element("span", "login-launch__step login-launch__step--2", "DATA / SYNCHRONIZING"),
+    element("span", "login-launch__step login-launch__step--3", "WORKSPACE / READY")
+  );
+  launch.append(element("span", "login-launch__scan"), launchCore, launchCopy);
+
   let autoTimer = null;
   let authInFlight = false;
   let queuedAuto = false;
@@ -2282,10 +2301,12 @@ function showLogin(message = "") {
       input.value = "";
       input.readOnly = true;
       form.dataset.state = "success";
+      panel.dataset.transition = "launch";
+      launch.setAttribute("aria-hidden", "false");
       status.classList.add("login-status--success");
-      status.textContent = "認証完了。パフォーマンス環境を準備しています";
+      status.textContent = "認証完了。パフォーマンス環境を起動しています";
       button.textContent = "認証完了";
-      setConnection("idle", "環境を準備中");
+      setConnection("idle", "環境を起動中");
       await loadDashboardData({ fromLogin: true });
     } catch (error) {
       if (input.value !== submittedPassword) return;
@@ -2326,7 +2347,7 @@ function showLogin(message = "") {
     clearTimeout(autoTimer);
     authenticate({ automatic: false }).catch(showFatalError);
   });
-  panel.append(form);
+  panel.append(form, launch);
   dashboard.append(panel);
   observedValue = input.value;
   watchTimer = setInterval(() => {

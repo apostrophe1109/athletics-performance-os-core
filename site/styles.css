@@ -559,8 +559,64 @@ button:not(:disabled).is-pressed * { color: #041015 !important; }
 body[data-auth-state="login"] .refresh-button { opacity: 0; pointer-events: none; }
 body[data-auth-state="login"] .topbar-actions { opacity: .72; transition: opacity 800ms ease; }
 body[data-auth-state="ready"] .topbar-actions { opacity: 1; transition: opacity 900ms ease; }
+.login-launch {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 26px;
+  padding: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1.015);
+  background:
+    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 26rem),
+    linear-gradient(180deg, rgba(2,8,13,.54), rgba(2,8,13,.88));
+  backdrop-filter: blur(10px) saturate(120%);
+}
+.login-panel[data-transition="launch"] .login-form {
+  opacity: 0;
+  transform: scale(.965);
+  filter: blur(8px);
+  transition: opacity 380ms ease, transform 700ms var(--motion-ease), filter 520ms ease;
+}
+.login-panel[data-transition="launch"] .login-launch {
+  animation: apos-launch-stage 1250ms var(--motion-ease) both;
+}
+.login-launch__scan {
+  position: absolute;
+  inset: -20% 0 auto;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--accent) 28%, transparent), transparent);
+  filter: blur(8px);
+  opacity: .7;
+}
+.login-panel[data-transition="launch"] .login-launch__scan { animation: apos-launch-scan 1180ms cubic-bezier(.2,.7,.2,1) both; }
+.login-launch__core { position: relative; width: 118px; aspect-ratio: 1; display: grid; place-items: center; }
+.login-launch__ring { position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); border-radius: 50%; box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 9%, transparent), inset 0 0 22px color-mix(in srgb, var(--accent) 4%, transparent); }
+.login-launch__ring--inner { inset: 18px; border-color: color-mix(in srgb, var(--accent-2) 36%, transparent); }
+.login-launch__pulse { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 45%, transparent); }
+.login-launch__mark { position: relative; z-index: 2; color: color-mix(in srgb, var(--text) 88%, var(--accent)); font-size: .72rem; letter-spacing: .22em; transform: translateX(.11em); }
+.login-panel[data-transition="launch"] .login-launch__ring--outer { animation: apos-launch-ring 1100ms cubic-bezier(.2,.75,.2,1) both; }
+.login-panel[data-transition="launch"] .login-launch__ring--inner { animation: apos-launch-ring-reverse 1100ms cubic-bezier(.2,.75,.2,1) both; }
+.login-panel[data-transition="launch"] .login-launch__pulse { animation: apos-launch-pulse 950ms ease-out both; }
+.login-launch__copy { display: grid; justify-items: center; gap: 5px; text-align: center; }
+.login-launch__eyebrow { color: var(--accent); font-size: .55rem; font-weight: 850; letter-spacing: .22em; }
+.login-launch__title { font-size: clamp(.9rem, 3vw, 1.1rem); letter-spacing: .10em; }
+.login-launch__step { color: var(--muted); font-size: .55rem; letter-spacing: .12em; opacity: 0; }
+.login-panel[data-transition="launch"] .login-launch__step--1 { animation: apos-launch-step 240ms ease 220ms forwards; }
+.login-panel[data-transition="launch"] .login-launch__step--2 { animation: apos-launch-step 240ms ease 480ms forwards; }
+.login-panel[data-transition="launch"] .login-launch__step--3 { animation: apos-launch-step 240ms ease 760ms forwards; color: var(--accent-2); }
 @keyframes apos-login-progress { 0% { transform: translateX(-120%); } 58%, 100% { transform: translateX(260%); } }
 @keyframes apos-auth-exit { to { opacity: 0; transform: translateY(-8px) scale(.985); filter: blur(8px); } }
+@keyframes apos-launch-stage { 0% { opacity: 0; transform: scale(1.015); } 18%, 82% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.992); } }
+@keyframes apos-launch-scan { 0% { transform: translateY(-30%); opacity: 0; } 20% { opacity: .8; } 100% { transform: translateY(460%); opacity: 0; } }
+@keyframes apos-launch-ring { 0% { transform: scale(.55) rotate(-90deg); opacity: 0; } 28% { opacity: 1; } 100% { transform: scale(1.14) rotate(210deg); opacity: .18; } }
+@keyframes apos-launch-ring-reverse { 0% { transform: scale(.35) rotate(120deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(.92) rotate(-180deg); opacity: .28; } }
+@keyframes apos-launch-pulse { 0% { transform: scale(.3); opacity: 0; } 28% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 45%, transparent); } 100% { transform: scale(.75); opacity: .15; box-shadow: 0 0 0 42px transparent, 0 0 10px transparent; } }
+@keyframes apos-launch-step { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
 .skeleton-panel { min-height: 160px; display: grid; gap: 13px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .skeleton { height: 16px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.13), rgba(255,255,255,.05)); background-size: 220% 100%; animation: shimmer 1.4s infinite; }
@@ -787,7 +843,10 @@ body[data-auth-state="ready"] .topbar-actions { opacity: 1; transition: opacity 
   .login-panel { min-height: calc(100dvh - 92px); border-radius: 18px; }
   .login-form { padding: 26px 20px 24px; border-radius: 22px; }
   .login-copy { font-size: .78rem; line-height: 1.72; }
+  .login-launch { gap: 22px; padding: 20px; }
+  .login-launch__core { width: 104px; }
 }
+
 
 
 @media (prefers-reduced-motion: reduce) {
