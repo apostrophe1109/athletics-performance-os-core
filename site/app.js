@@ -951,9 +951,15 @@ function renderSprintTiming(item, score, measurements) {
   distances.forEach(distance => {
     const band = targetPercentForDistance(item, score, distance);
     const baseline = bestSprintBaseline(distance, measurements);
+    const explicitTarget = explicitSprintTargetTime(item, distance);
     const card = element("div", "day-menu-timing__card");
     card.append(element("strong", "day-menu-timing__distance", `${distance}m`), element("span", "day-menu-timing__percent", `MAX ${formatPercentBand(band)}`));
-    if (baseline) {
+    if (explicitTarget) {
+      card.append(
+        element("b", "day-menu-timing__target", explicitTarget),
+        element("small", "", "正本に保存された設定タイム / 設計値")
+      );
+    } else if (baseline) {
       card.append(
         element("b", "day-menu-timing__target", sprintTargetTimeText(baseline.timeSec, band, distance)),
         element("small", "", `参考MAX ${Number(baseline.timeSec).toFixed(2)}秒 / ${formatShortDate(baseline.date)}${baseline.dataQuality === "LIMITED" || baseline.measurementMethod === "UNREPORTED" ? " / 条件未統一" : ""}`)
@@ -969,6 +975,18 @@ function renderSprintTiming(item, score, measurements) {
   section.append(grid);
   section.append(element("p", "day-menu-timing__note", "設定タイムは距離別MAXの平均速度比から算出する参考値です。比較時は計時方式・スタート・走路・シューズ等の条件をそろえてください。"));
   return section;
+}
+
+function explicitSprintTargetTime(item, distance) {
+  const sources = [item?.session?.requirements, item?.session?.notes, item?.session?.bridge, item?.detail]
+    .filter(Boolean)
+    .map(String);
+  const pattern = new RegExp(`${distance}m\\s*[:：]?\\s*(\\d{1,2}(?:\\.\\d+)?)\\s*[〜~\\-]\\s*(\\d{1,2}(?:\\.\\d+)?)\\s*秒`, "i");
+  for (const source of sources) {
+    const match = source.match(pattern);
+    if (match) return `${match[1]}〜${match[2]}秒`;
+  }
+  return "";
 }
 
 function bestSprintBaseline(distance, measurements) {

@@ -1,19 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_e0f862f854624463b3182d758f16b34c",
-  "generatedAt": "2026-08-24T06:34:29.780Z",
-  "baseCommitSha": "7a4c69f718414df609038e8d1985d11a12067318",
-  "changeReason": "本人指示に基づき、ジャンプスクワットとフライングスプリットを日付に関係なく7/10へ統一し、明示強度を最優先する同期ロジックを反映する",
+  "deploymentId": "SITEDEPLOY_a836572123e34b15a8ab0b4498b6a840",
+  "generatedAt": "2026-08-27T04:47:52.549Z",
+  "baseCommitSha": "b1e876f9f61454d0e15eae7cc6269a9f6446dcc1",
+  "changeReason": "設定タイムの明示設計値をAPOS Viewで優先表示する変更を本人の明示承認に基づき反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "e2b1cad78d4a63753912ff1f57d420de62cdc0bc7b36be942e84cbbaae5754be"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "c6a320ff94959afb73c2e7d651802824861b7b4b3dbb3dc225c61709a941c8e2"
+      "contentHash": "e2aa7d93eedd455ff8d97ff0ca3f5cde7a2aeb229c3225c0ff800f9a2713440f"
     }
   ]
 }
