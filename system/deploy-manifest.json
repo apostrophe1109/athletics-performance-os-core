@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_0ae05dfe522f4d7ea4f9bbf27685dd25",
-  "generatedAt": "2026-08-25T10:51:11.161Z",
-  "baseCommitSha": "fbe3bc1e590ecc31ead543664c5ebda4b90d1a53",
-  "changeReason": "承認済み最終Previewと完全に同一の内容で、Repository Code.gsを本番Apps Script 1.2.5へ最終正規化する",
+  "deploymentId": "SITEDEPLOY_2628cea1884945ceba241e0ad772f0d8",
+  "generatedAt": "2026-08-27T04:52:00.409Z",
+  "baseCommitSha": "bee8fc5de8f1ec8f38b1cba47e17e2276a19ab5f",
+  "changeReason": "承認不要・確認不要等を明示し同一依頼内で非破壊変更の反映を指示した場合、内部Preview後に追加承認確認を挟まずApplyする運用ルールを反映する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "fead4cf2dfa96383fb4e7b20c59aacf797a30a41bd1bfc1adc5aca48173dd392"
+      "contentHash": "528e016ed6c2fb4c9739c7622851ab418f227ba6767fb75b3ab643e96b4d033b"
     }
   ]
 }

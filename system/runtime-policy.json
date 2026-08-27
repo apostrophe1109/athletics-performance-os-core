@@ -56,6 +56,11 @@
     "exactPreviewContentRequired": true,
     "archiveDeleteRollbackBackupRequirePostPreviewApproval": true
   },
+  "inlineApprovalLanguage": {
+    "rule": "When 山下祐樹 gives an exact-scope non-destructive change request and in the same message explicitly waives preview presentation/extra confirmation (for example 承認いらない, 確認不要, プレビュー表示不要) AND uses an apply verb (for example 反映して, 記録して, 更新して, 実装して), treat that message as inline explicit approval for the matching internal Preview. Execute Preview internally, confirm the locked Preview exactly matches the requested scope, then Apply without asking an additional approval question. Internal Preview, approvalHash, nonce, race protection, and post-Apply Verify remain mandatory. This is not standing pre-approval for unspecified future changes. Destructive operations, ARCHIVE/DELETE, rollback, backup, or scope changes still require the applicable post-Preview approval.",
+    "noExtraApprovalCushionForExactNonDestructiveScope": true,
+    "standingPreApprovalAllowed": false
+  },
   "interactionPresentation": {
     "showApprovalHash": false,
     "showPreviewExpiry": false,
