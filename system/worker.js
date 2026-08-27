@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.23
+ * Version: 1.4.24
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,11 +26,13 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.23";
+const VERSION = "1.4.24";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
-const BACKEND_READ_TIMEOUT_MS = 25000;
+const BACKEND_READ_TIMEOUT_MS = 32000;
 const BACKEND_WRITE_TIMEOUT_MS = 38000;
+const BACKEND_READ_MAX_ATTEMPTS = 3;
+const BACKEND_READ_RETRY_DELAYS_MS = [250, 750];
 const WEB_SESSION_TTL_SECONDS = 8 * 60 * 60;
 const WEB_LOGIN_MAX_FAILURES = 8;
 const WEB_LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -1918,7 +1920,7 @@ async function getMaintenanceDeploymentStatus(payload, env) {
 
 async function callAppsScript(action, body, actor, env, retrySafe, requestId) {
   const url = normalizeAppsScriptUrl(requiredEnv(env, "APOS_APPS_SCRIPT_URL"));
-  const attempts = retrySafe ? 2 : 1;
+  const attempts = retrySafe ? BACKEND_READ_MAX_ATTEMPTS : 1;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const controller = new AbortController();
@@ -1940,7 +1942,9 @@ async function callAppsScript(action, body, actor, env, retrySafe, requestId) {
       return parsed;
     } catch (error) {
       lastError = error;
-      if (attempt >= attempts) break;
+      if (attempt >= attempts || !retrySafe) break;
+      const delayMs = BACKEND_READ_RETRY_DELAYS_MS[Math.min(attempt - 1, BACKEND_READ_RETRY_DELAYS_MS.length - 1)] || 250;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     } finally {
       clearTimeout(timeout);
     }

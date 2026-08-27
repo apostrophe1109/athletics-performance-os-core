@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_2628cea1884945ceba241e0ad772f0d8",
-  "generatedAt": "2026-08-27T04:52:00.409Z",
-  "baseCommitSha": "bee8fc5de8f1ec8f38b1cba47e17e2276a19ab5f",
-  "changeReason": "承認不要・確認不要等を明示し同一依頼内で非破壊変更の反映を指示した場合、内部Preview後に追加承認確認を挟まずApplyする運用ルールを反映する。",
+  "deploymentId": "SITEDEPLOY_cdd2646192ac4e4194fc46cd5bc400b4",
+  "generatedAt": "2026-08-27T08:08:27.646Z",
+  "baseCommitSha": "93062036c44850f463828f9e6ac53e6366b955e2",
+  "changeReason": "Preview/READ系のApps Script一時接続失敗を安全に吸収するGateway修正を反映する。書き込み操作の自動再送は禁止のまま維持する。",
   "files": [
     {
-      "path": "system/runtime-policy.json",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "528e016ed6c2fb4c9739c7622851ab418f227ba6767fb75b3ab643e96b4d033b"
+      "contentHash": "7f5e84568b2185fd054f967075ac52a78270a646211fd2105b98eaf5d2837a3d"
     }
   ]
 }
