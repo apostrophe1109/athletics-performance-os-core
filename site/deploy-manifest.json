@@ -1,24 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_aa7e97e4759747528a1b2a21d33646e7",
-  "generatedAt": "2026-08-27T23:02:19.566Z",
-  "baseCommitSha": "fb758da0ad02330e73cd22bae828b7d426b60fee",
-  "changeReason": "承認済みPreviewと同一内容のAPOSログイン起動演出v2をサイトへ反映する",
+  "deploymentId": "SITEDEPLOY_fbc44525595141e899adefc88f8cd61c",
+  "generatedAt": "2026-08-27T23:23:21.662Z",
+  "baseCommitSha": "9aec358917cb84d109f80b08f4889d207e9285ac",
+  "changeReason": "Preview表示不要の明示承認に基づき、APOSの色役割を定義通りサイトへ反映する",
   "files": [
-    {
-      "path": "site/app.js",
-      "operation": "UPSERT",
-      "contentHash": "ce7b0679a5c0c09199dece5bb4d477a1a4dc301f816e3b4b36ebb3658aad9755"
-    },
     {
       "path": "site/styles.css",
       "operation": "UPSERT",
-      "contentHash": "bd6942900e7715d7b3eef8a238db3ec107ca78811c13d14114256039d768f0b4"
+      "contentHash": "1ad98f764d7548060a55e46f1d649f38d6366c9ec3aa401072f67ea48ece4ec1"
     },
     {
       "path": "site/index.html",
       "operation": "UPSERT",
-      "contentHash": "98d7be450b987d347e0d757363a9005718b6ab4600c4b37ac092b7970626d7ae"
+      "contentHash": "395e0913edd8c22c73bb9ae6efbd30086d5dae0fde6615373b29c39e9d9f2aba"
     }
   ]
 }
