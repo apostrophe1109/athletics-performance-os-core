@@ -495,7 +495,7 @@ function dayMenuEntries(context, sessions) {
         session: sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null
       };
     });
-    return groupHighSpeedConversionEntries(entries);
+    return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(entries), sessions);
   }
 
   const bridgeEntries = sessions.flatMap(session => compactBridgeItems(session.bridge)
@@ -512,9 +512,9 @@ function dayMenuEntries(context, sessions) {
         session
       };
     }));
-  if (bridgeEntries.length) return groupHighSpeedConversionEntries(bridgeEntries);
+  if (bridgeEntries.length) return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(bridgeEntries), sessions);
 
-  return sessions.map(session => ({
+  return appendRequirementExerciseEntries(sessions.map(session => ({
     title: session.title || session.role || "セッション",
     detail: session.purpose || "",
     dose: sessionDoseText(session),
@@ -523,7 +523,35 @@ function dayMenuEntries(context, sessions) {
     intensityEstimated: false,
     exerciseId: null,
     session
-  }));
+  })), sessions);
+}
+
+function appendRequirementExerciseEntries(entries, sessions) {
+  const output = Array.isArray(entries) ? [...entries] : [];
+  const sessionList = Array.isArray(sessions) ? sessions : [];
+  const alreadyIncluded = output.some(item => item?.exerciseId === "EX064");
+  if (alreadyIncluded) return output;
+
+  const session = sessionList.find(item => /EX064|三段跳び接地ポジションアイソメトリック/.test(String(item?.requirements || "")));
+  if (!session) return output;
+
+  const requirements = String(session.requirements || "");
+  const phase1 = /Phase1/.test(requirements);
+  const entry = {
+    title: "三段跳び接地ポジションアイソメトリック",
+    detail: phase1 ? "Phase1｜股関節周囲の認識・動員" : "種目マスターの現行Phase｜接地支持プライマー",
+    dose: /各10〜15秒×1/.test(requirements) ? "3ポジション 各10〜15秒×1" : "現行Phaseを低量実施",
+    section: "primer",
+    intensityScore: resolvedTrainingIntensity("三段跳び接地ポジションアイソメトリック 神経筋プライミング", session, phase1 ? "MODERATE-HIGH" : null),
+    intensityEstimated: false,
+    exerciseId: "EX064",
+    session
+  };
+
+  let insertAt = output.findIndex(item => /高速変換|メディシン|ポゴ|20m(?:ダッシュ|プライマー)|(?:^|\s)(?:60m|80m|100m|120m|150m)\b|全助走|トリプル|跳躍/.test(String(item?.title || "")));
+  if (insertAt < 0) insertAt = output.length;
+  output.splice(insertAt, 0, entry);
+  return output;
 }
 
 function groupHighSpeedConversionEntries(entries) {

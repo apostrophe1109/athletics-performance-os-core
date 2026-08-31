@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_5077678ce0c24ea0ae232a9a8e29bc41",
-  "generatedAt": "2026-08-31T06:15:09.590Z",
-  "baseCommitSha": "1dc8b1b08aa8929ca08c6a2a4e0e896d414ee0bc",
-  "changeReason": "承認済み種目ID連番化に伴いサイトでは種目名のみ表示しUI連番を削除",
+  "deploymentId": "SITEDEPLOY_a26b038b88c14c8c91bc59f0d2a24e95",
+  "generatedAt": "2026-08-31T06:17:34.045Z",
+  "baseCommitSha": "e52841e598fed64f22f50ed3e398078b3d917e45",
+  "changeReason": "最新ソースで再Previewした同一変更を承認済みとして反映する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "4a0a6debb2c61b71be3bb3ace5d34099e634565612e1108fcd33eaac06ab3ba9"
+      "contentHash": "a432ccb1984862c6ef7ee3b88dc4617952bd78b49a043c6d109dc8dfb753a7a8"
     }
   ]
 }
