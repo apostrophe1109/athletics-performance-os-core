@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9d9862543c134adf9efd83767b6bf90f",
-  "generatedAt": "2026-08-31T04:22:06.924Z",
-  "baseCommitSha": "29951bbfe50f130bc1cf6ac8e542e2fd02e46f0f",
-  "changeReason": "承認済みPreviewのボタン押下・読み込み中フィードバックをサイトへ反映する",
+  "deploymentId": "SITEDEPLOY_5077678ce0c24ea0ae232a9a8e29bc41",
+  "generatedAt": "2026-08-31T06:15:09.590Z",
+  "baseCommitSha": "1dc8b1b08aa8929ca08c6a2a4e0e896d414ee0bc",
+  "changeReason": "承認済み種目ID連番化に伴いサイトでは種目名のみ表示しUI連番を削除",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "5aa3c08b19025a43872c5e52d02351ce0fb979e401bad0db16432d636aef6ff8"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "b4881703aa041d3580890edfdf1203abe0c63d2c133f688e01961f95546ea156"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "b2026074862c72d985a4a2a61499bbc68fb5cdf425c7f1aacd5633efa66970e3"
+      "contentHash": "4a0a6debb2c61b71be3bb3ace5d34099e634565612e1108fcd33eaac06ab3ba9"
     }
   ]
 }

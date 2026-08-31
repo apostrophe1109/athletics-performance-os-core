@@ -383,7 +383,6 @@ function renderDayMenuSections(context, sessions) {
     const copy = element("div", "day-menu-row__copy");
     const titleLine = element("div", "day-menu-row__title");
     titleLine.append(
-      element("span", "day-menu-row__index", String(index + 1)),
       element("strong", "", item.title)
     );
     copy.append(titleLine);
