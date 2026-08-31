@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_b3cf670184584dd182ebac8825cc3b20",
-  "generatedAt": "2026-08-31T04:05:22.524Z",
-  "baseCommitSha": "69cf904b927db663a095879fb3cae32f317f498e",
-  "changeReason": "システム監査で検出したruntime-policy実稼働バージョン表記不一致を自動修正",
+  "deploymentId": "SITEDEPLOY_80686ea421e141fc91b2afbe28a67576",
+  "generatedAt": "2026-08-31T06:12:55.384Z",
+  "baseCommitSha": "69ec306e0698f48890762275fdfb712b3583deca",
+  "changeReason": "承認済み種目ID連番化を完全完了するため旧EX_202608長形式ID削除専用の限定例外を適用",
   "files": [
     {
-      "path": "system/runtime-policy.json",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "afd1714e99ae516f63f50fd6f509214beb7c7732431d480d90f491e6ca77cde5"
+      "contentHash": "a96ec274f65dfee0a506445f2b1900da78a7b0181c0213706fb06cc3f1f122e1"
     }
   ]
 }
