@@ -47,7 +47,7 @@ const dashboard = document.querySelector("#dashboard");
 const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
 const refreshButton = document.querySelector("#refresh-button");
-refreshButton?.addEventListener("click", () => refreshVisibleData().catch(showFatalError));
+refreshButton?.addEventListener("click", () => runUiAction(refreshButton, "最新データを同期中", () => refreshVisibleData()).catch(showFatalError));
 installTapFeedback();
 
 boot().catch(error => {
@@ -281,7 +281,7 @@ function renderViewTabs() {
     button.type = "button";
     button.dataset.active = String(state.viewMode === mode);
     button.setAttribute("aria-pressed", String(state.viewMode === mode));
-    button.addEventListener("click", () => switchViewMode(mode).catch(showFatalError));
+    button.addEventListener("click", () => runUiAction(button, "表示を切り替え中", () => switchViewMode(mode)).catch(showFatalError));
     nav.append(button);
   });
   return nav;
@@ -402,7 +402,7 @@ function renderDayMenuSections(context, sessions) {
     detail.append(detailInner);
 
     toggle.addEventListener("click", () => {
-      toggleDayMenuDetail(detailKey, item, score, toggle, detail, detailInner).catch(showFatalError);
+      runUiAction(toggle, "詳細データを読み込み中", () => toggleDayMenuDetail(detailKey, item, score, toggle, detail, detailInner)).catch(showFatalError);
     });
     row.append(toggle, detail);
     list.append(row);
@@ -1485,7 +1485,7 @@ function renderWeekView() {
       card.append(stop);
     }
 
-    card.addEventListener("click", () => loadDayContext(date, { motion: true }).catch(showFatalError));
+    card.addEventListener("click", () => runUiAction(card, "日別データを読み込み中", () => loadDayContext(date, { motion: true })).catch(showFatalError));
     list.append(card);
   });
   wrap.append(list);
@@ -1522,7 +1522,7 @@ function renderMonthView() {
         element("span", "month-day__main", monthMainText(primary))
       );
     }
-    cell.addEventListener("click", () => loadDayContext(date, { motion: true }).catch(showFatalError));
+    cell.addEventListener("click", () => runUiAction(cell, "日別データを読み込み中", () => loadDayContext(date, { motion: true })).catch(showFatalError));
     grid.append(cell);
   }
   wrap.append(grid);
@@ -1540,9 +1540,9 @@ function renderPeriodNavigator(mode) {
   const today = element("button", "period-nav__today", "今日へ");
   const next = element("button", "period-nav__button", labels[mode][1]);
   previous.type = today.type = next.type = "button";
-  previous.addEventListener("click", () => navigatePeriod(mode, -1).catch(showFatalError));
-  next.addEventListener("click", () => navigatePeriod(mode, 1).catch(showFatalError));
-  today.addEventListener("click", () => navigateToToday(mode).catch(showFatalError));
+  previous.addEventListener("click", () => runUiAction(previous, "期間データを読み込み中", () => navigatePeriod(mode, -1)).catch(showFatalError));
+  next.addEventListener("click", () => runUiAction(next, "期間データを読み込み中", () => navigatePeriod(mode, 1)).catch(showFatalError));
+  today.addEventListener("click", () => runUiAction(today, "今日のデータを読み込み中", () => navigateToToday(mode)).catch(showFatalError));
   nav.append(previous, today, next);
   return nav;
 }
@@ -1665,7 +1665,7 @@ function renderSecondaryWorkspace() {
     button.type = "button";
     button.dataset.active = String(state.secondaryView === view);
     button.setAttribute("aria-pressed", String(state.secondaryView === view));
-    button.addEventListener("click", () => switchSecondaryView(view).catch(showFatalError));
+    button.addEventListener("click", () => runUiAction(button, "データを読み込み中", () => switchSecondaryView(view)).catch(showFatalError));
     nav.append(button);
   });
 
@@ -1802,7 +1802,7 @@ function renderExercises() {
   }
   form.addEventListener("submit", event => {
     event.preventDefault();
-    searchExerciseLibrary(input.value).catch(showFatalError);
+    runUiAction(submit, "種目マスターを検索中", () => searchExerciseLibrary(input.value)).catch(showFatalError);
   });
   panel.append(form);
 
@@ -1842,7 +1842,7 @@ function exerciseLibraryCard(exercise, matchedFields = []) {
   if (body) card.append(element("p", "", body));
   if (matchedFields.length) card.append(element("p", "exercise-match", `一致: ${matchedFields.join("・")}`));
   card.append(element("span", "exercise-card__open", "詳細を見る →"));
-  card.addEventListener("click", () => openExerciseDetail(exercise.exerciseId).catch(showFatalError));
+  card.addEventListener("click", () => runUiAction(card, "種目詳細を読み込み中", () => openExerciseDetail(exercise.exerciseId)).catch(showFatalError));
   return card;
 }
 
@@ -2394,7 +2394,7 @@ function installTapFeedback() {
   const selector = "button, [role='button']";
   const release = () => {
     document.querySelectorAll(".is-pressed").forEach(node => {
-      setTimeout(() => node.classList.remove("is-pressed"), 110);
+      setTimeout(() => node.classList.remove("is-pressed"), 180);
     });
   };
   document.addEventListener("pointerdown", event => {
@@ -2411,6 +2411,78 @@ function installTapFeedback() {
     target.classList.add("is-pressed");
   });
   document.addEventListener("keyup", release);
+}
+
+const actionFeedback = {
+  depth: 0,
+  overlay: null,
+  label: null,
+  timer: null,
+  shownAt: 0
+};
+
+function ensureActionLoadingOverlay() {
+  if (actionFeedback.overlay?.isConnected) return actionFeedback.overlay;
+  const overlay = element("div", "action-loading");
+  overlay.setAttribute("aria-hidden", "true");
+  const panel = element("div", "action-loading__panel");
+  panel.setAttribute("role", "status");
+  panel.setAttribute("aria-live", "polite");
+  const spinner = element("span", "action-loading__spinner");
+  const core = element("span", "action-loading__core", "APOS");
+  const copy = element("div", "action-loading__copy");
+  copy.append(
+    element("span", "action-loading__eyebrow", "PROCESSING"),
+    element("strong", "action-loading__label", "読み込み中"),
+    element("span", "action-loading__signal", "•••")
+  );
+  panel.append(spinner, core, copy);
+  overlay.append(panel);
+  document.body.append(overlay);
+  actionFeedback.overlay = overlay;
+  actionFeedback.label = copy.querySelector(".action-loading__label");
+  return overlay;
+}
+
+async function runUiAction(trigger, label, task, { delay = 120, minVisible = 420 } = {}) {
+  if (trigger?.disabled) return;
+  const overlay = ensureActionLoadingOverlay();
+  actionFeedback.depth += 1;
+  if (trigger) {
+    trigger.classList.add("is-busy");
+    trigger.setAttribute("aria-busy", "true");
+  }
+  if (actionFeedback.label) actionFeedback.label.textContent = label || "読み込み中";
+
+  const show = () => {
+    actionFeedback.shownAt = performance.now();
+    overlay.dataset.visible = "true";
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.dataset.actionBusy = "true";
+  };
+  clearTimeout(actionFeedback.timer);
+  actionFeedback.timer = setTimeout(show, prefersReducedMotion() ? 0 : delay);
+
+  try {
+    return await task();
+  } finally {
+    actionFeedback.depth = Math.max(0, actionFeedback.depth - 1);
+    if (trigger?.isConnected) {
+      trigger.classList.remove("is-busy");
+      trigger.removeAttribute("aria-busy");
+    }
+    if (actionFeedback.depth === 0) {
+      clearTimeout(actionFeedback.timer);
+      const elapsed = performance.now() - actionFeedback.shownAt;
+      const wait = overlay.dataset.visible === "true" ? Math.max(0, minVisible - elapsed) : 0;
+      setTimeout(() => {
+        if (actionFeedback.depth !== 0) return;
+        overlay.dataset.visible = "false";
+        overlay.setAttribute("aria-hidden", "true");
+        delete document.body.dataset.actionBusy;
+      }, prefersReducedMotion() ? 0 : wait);
+    }
+  }
 }
 
 async function authRequest(path, payload) {
