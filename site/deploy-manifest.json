@@ -1,19 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_41d3b5e6d0f44fbea0450ba794e4eb40",
-  "generatedAt": "2026-08-31T22:08:05.704Z",
-  "baseCommitSha": "793a2db541415921d1eff5044d30efb3deacf912",
-  "changeReason": "承認済みのiPhone練習メニューレイアウト修正を同一内容の最新Previewへ安全に反映する",
+  "deploymentId": "SITEDEPLOY_6768324de52d4322be741c2188f11633",
+  "generatedAt": "2026-09-01T12:43:25.690Z",
+  "baseCommitSha": "cca7ade99db8d36963390b34b892165e084ac458",
+  "changeReason": "承認済みサイト修正Previewどおり、EX064の二重表示と強度分裂を解消して1行表示に統一する。",
   "files": [
     {
-      "path": "site/styles.css",
+      "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "13bf88ee40c23783637215151e16c00778aab7193bea01486b03202fa33cc4e5"
-    },
-    {
-      "path": "site/index.html",
-      "operation": "UPSERT",
-      "contentHash": "7628b24e72a4fe0679d2619357e537ae5edcc91bb47436c499cd8a3d70e1fe85"
+      "contentHash": "7ddef9553a213df1364c9b5e998784db502ed05dbe4fb30ee0d388c5a47c7cfd"
     }
   ]
 }

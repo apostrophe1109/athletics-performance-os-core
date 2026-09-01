@@ -529,8 +529,8 @@ function dayMenuEntries(context, sessions) {
 function appendRequirementExerciseEntries(entries, sessions) {
   const output = Array.isArray(entries) ? [...entries] : [];
   const sessionList = Array.isArray(sessions) ? sessions : [];
-  const alreadyIncluded = output.some(item => item?.exerciseId === "EX064");
-  if (alreadyIncluded) return output;
+  const canonicalIndex = output.findIndex(item => item?.exerciseId === "EX064");
+  if (canonicalIndex >= 0) return output;
 
   const session = sessionList.find(item => /EX064|三段跳び接地ポジションアイソメトリック/.test(String(item?.requirements || "")));
   if (!session) return output;
@@ -547,6 +547,12 @@ function appendRequirementExerciseEntries(entries, sessions) {
     exerciseId: "EX064",
     session
   };
+
+  const matchingBridgeIndex = output.findIndex(item => /EX064|三段跳び接地ポジションアイソメトリック/.test(String(item?.title || "")));
+  if (matchingBridgeIndex >= 0) {
+    output.splice(matchingBridgeIndex, 1, entry);
+    return output;
+  }
 
   let insertAt = output.findIndex(item => /高速変換|メディシン|ポゴ|20m(?:ダッシュ|プライマー)|(?:^|\s)(?:60m|80m|100m|120m|150m)\b|全助走|トリプル|跳躍/.test(String(item?.title || "")));
   if (insertAt < 0) insertAt = output.length;
