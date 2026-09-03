@@ -369,16 +369,17 @@ function renderDayMenuSections(context, sessions) {
 
   const list = element("ul", "day-menu-section__list");
   entries.forEach((item, index) => {
-    const score = Number.isFinite(item.intensityScore) ? item.intensityScore : null;
+    const recoveryOnly = isRecoveryOnlyItem(item.title);
+    const score = recoveryOnly ? null : (Number.isFinite(item.intensityScore) ? item.intensityScore : null);
     const row = element("li", "day-menu-row");
-    row.dataset.intensityBand = intensityBand(score);
+    row.dataset.intensityBand = recoveryOnly ? "low" : intensityBand(score);
 
     const detailKey = dayMenuDetailKey(item, index);
     const expanded = state.openDayMenuDetails.has(detailKey);
     const toggle = element("button", "day-menu-row__toggle");
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", String(expanded));
-    toggle.title = `強度 ${score}/10・タップで詳細表示`;
+    toggle.title = recoveryOnly ? "休息・タップで詳細表示" : `強度 ${score}/10・タップで詳細表示`;
 
     const copy = element("div", "day-menu-row__copy");
     const titleLine = element("div", "day-menu-row__title");
@@ -389,7 +390,8 @@ function renderDayMenuSections(context, sessions) {
     if (item.detail) copy.append(element("span", "", item.detail));
 
     const meta = element("div", "day-menu-row__meta");
-    if (score !== null) meta.append(element("span", "day-menu-row__intensity", `${score}/10`));
+    if (recoveryOnly) meta.append(element("span", "day-menu-row__intensity", "休息"));
+    else if (score !== null) meta.append(element("span", "day-menu-row__intensity", `${score}/10`));
     if (item.dose) meta.append(element("span", "day-menu-row__dose", item.dose));
     meta.append(element("span", "day-menu-row__chevron", "⌄"));
     toggle.append(copy, meta);
@@ -413,11 +415,20 @@ function renderDayMenuSections(context, sessions) {
 
 function hideExerciseMasterIds(value) {
   return String(value || "")
-    .replace(/[（(]\s*EX\d{2,4}\s*[）)]/gi, "")
-    .replace(/\bEX\d{2,4}\b/gi, "")
+    .replace(/[（(]\s*EX\s*\d{2,4}\s*[）)]/gi, "")
+    .replace(/(?:^|[\s　・:：/／-])EX\s*\d{2,4}(?=$|[\s　・:：/／-])/gi, match => match.replace(/EX\s*\d{2,4}/i, ""))
+    .replace(/EX\s*\d{2,4}/gi, "")
     .replace(/[ \t]{2,}/g, " ")
-    .replace(/\s+([、。・／/])/g, "$1")
+    .replace(/\s+([、。・／/:：])/g, "$1")
     .trim();
+}
+
+function isRecoveryOnlyItem(value) {
+  const text = String(value || "").trim().replace(/\s+/g, "");
+  if (!text) return false;
+  return /^(?:完全)?(?:休息|休養|回復|REST)$/i.test(text)
+    || /^\d+(?:〜|~|-)?\d*分(?:間)?(?:完全)?(?:回復|休息|休養)$/i.test(text)
+    || /^\d+(?:〜|~|-)?\d*秒(?:間)?(?:完全)?(?:回復|休息|休養)$/i.test(text);
 }
 
 function compactBridgeItems(raw) {
@@ -756,12 +767,21 @@ function renderDayMenuDetail(container, item, score, exercise, sprintBaselines =
     return;
   }
 
+  const recoveryOnly = isRecoveryOnlyItem(item?.title);
   const facts = element("div", "day-menu-detail__facts");
-  facts.append(
-    dayMenuFact("強度", `${score}/10`),
-    dayMenuFact("設定", item.dose || exercise?.initialPrescription || sprintSettingSummary(item, score)),
-    dayMenuFact("休息", exercise?.rest || dayMenuRestFromTitle(item.title) || "メニュー表記どおり")
-  );
+  if (recoveryOnly) {
+    facts.append(
+      dayMenuFact("区分", "休息・回復"),
+      dayMenuFact("時間", item.title),
+      dayMenuFact("目的", "次の高品質な反復に向けて回復する")
+    );
+  } else {
+    facts.append(
+      dayMenuFact("強度", `${score}/10`),
+      dayMenuFact("設定", item.dose || exercise?.initialPrescription || sprintSettingSummary(item, score)),
+      dayMenuFact("休息", exercise?.rest || dayMenuRestFromTitle(item.title) || "メニュー表記どおり")
+    );
+  }
   container.append(facts);
 
   if (isTimedSprintItem(item)) container.append(renderSprintTiming(item, score, sprintBaselines));
@@ -1122,6 +1142,7 @@ function bridgeIntensityEstimate(value, session) {
 function judgeTrainingIntensity(value, session) {
   const text = String(value || "");
   const normalized = text.toLowerCase();
+  if (isRecoveryOnlyItem(text)) return 1;
   const explicitTenScale = text.match(/強度\s*(10|[1-9])\s*\/\s*10/);
   if (explicitTenScale) return Math.max(1, Math.min(10, Number(explicitTenScale[1])));
   const percentages = [...text.matchAll(/(\d{2,3})(?:\s*[〜~\-]\s*(\d{2,3}))?\s*%/g)]
@@ -1778,7 +1799,7 @@ function renderHistory() {
     }
     const execution = item.execution;
     list.append(recordCard(
-      execution.exerciseName || execution.exerciseId || "実施記録",
+      execution.exerciseName || "実施記録",
       formatJapaneseDate(dateOnly(execution.executionDate)),
       [execution.successes, execution.improvements, execution.voiceTranscriptNormalized].filter(Boolean).join(" / ")
     ));
@@ -1872,7 +1893,7 @@ function exerciseLibraryCard(exercise, matchedFields = []) {
   card.type = "button";
   const top = element("div", "record-card__top");
   top.append(
-    element("h3", "", exercise.yukiName || exercise.generalName || exercise.exerciseId || "種目"),
+    element("h3", "", exercise.yukiName || exercise.generalName || "種目"),
     pill(exercise.category || "EXERCISE", true)
   );
   card.append(top);
@@ -1914,7 +1935,7 @@ function showExerciseDetailDialog(exercise) {
   const heading = element("div");
   heading.append(
     element("span", "eyebrow eyebrow--cyan", exercise.category || "EXERCISE MASTER"),
-    element("h2", "", exercise.yukiName || exercise.generalName || exercise.exerciseId || "種目詳細")
+    element("h2", "", exercise.yukiName || exercise.generalName || "種目詳細")
   );
   const close = element("button", "icon-button", "×");
   close.type = "button";
@@ -2156,6 +2177,7 @@ function sessionIntensity(session) {
   if (!session) return null;
   const raw = String(session.intensity || session.role || "").toUpperCase().replace(/[・〜~_\s]/g, "-");
   if (!raw) return null;
+  if (raw.includes("REST") || raw.includes("RECOVERY")) return 1;
   if (raw.includes("MAX") || raw.includes("PERFORMANCE") || raw.includes("COMPETITION")) return 10;
   if (raw.includes("HIGH") && raw.includes("MEDIUM")) return 8;
   if (raw.includes("HIGH")) return 9;
@@ -2163,7 +2185,6 @@ function sessionIntensity(session) {
   if (raw.includes("SHARP")) return 6;
   if (raw.includes("MEDIUM")) return 6;
   if (raw.includes("LOW")) return 3;
-  if (raw.includes("REST") || raw.includes("RECOVERY")) return 1;
   return 5;
 }
 
@@ -2236,7 +2257,7 @@ function empty(message) {
 function element(tag, className = "", text = null) {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== null && text !== undefined) node.textContent = String(text);
+  if (text !== null && text !== undefined) node.textContent = hideExerciseMasterIds(text);
   return node;
 }
 
