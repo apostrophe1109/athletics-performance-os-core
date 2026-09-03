@@ -411,10 +411,19 @@ function renderDayMenuSections(context, sessions) {
   return panel;
 }
 
+function hideExerciseMasterIds(value) {
+  return String(value || "")
+    .replace(/[（(]\s*EX\d{2,4}\s*[）)]/gi, "")
+    .replace(/\bEX\d{2,4}\b/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([、。・／/])/g, "$1")
+    .trim();
+}
+
 function compactBridgeItems(raw) {
   const parts = String(raw || "")
     .split(/→|\n+/)
-    .map(value => value.trim())
+    .map(value => hideExerciseMasterIds(value))
     .filter(Boolean);
   const output = [];
 
@@ -477,7 +486,7 @@ function dayMenuEntries(context, sessions) {
   const menu = context.menuItems || [];
   if (menu.length) {
     const entries = menu.map((item, index) => {
-      const title = item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`;
+      const title = hideExerciseMasterIds(item.exerciseNameSnapshot || item.exerciseName || item.menuName || `メニュー ${index + 1}`);
       const detail = item.cue || item.purpose || "";
       const searchable = [title, detail, item.category, item.block, item.section].filter(Boolean).join(" ");
       return {
@@ -1499,22 +1508,22 @@ function renderWeekView() {
 
     if (primary?.purpose) {
       const intent = element("p", "week-day__intent");
-      intent.append(element("span", "", "目的"), document.createTextNode(` ${primary.purpose}`));
+      intent.append(element("span", "", "目的"), document.createTextNode(` ${hideExerciseMasterIds(primary.purpose)}`));
       card.append(intent);
     }
     if (primary?.cue) {
       const cue = element("p", "week-day__cue");
-      cue.append(element("span", "", "キュー"), document.createTextNode(` ${primary.cue}`));
+      cue.append(element("span", "", "キュー"), document.createTextNode(` ${hideExerciseMasterIds(primary.cue)}`));
       card.append(cue);
     }
     if (primary?.requirements) {
       const requirements = element("p", "week-day__requirements");
-      requirements.append(element("span", "", "条件"), document.createTextNode(` ${primary.requirements}`));
+      requirements.append(element("span", "", "条件"), document.createTextNode(` ${hideExerciseMasterIds(primary.requirements)}`));
       card.append(requirements);
     }
     if (primary?.stopCondition) {
       const stop = element("p", "week-day__stop");
-      stop.append(element("span", "", "終了基準"), document.createTextNode(` ${primary.stopCondition}`));
+      stop.append(element("span", "", "終了基準"), document.createTextNode(` ${hideExerciseMasterIds(primary.stopCondition)}`));
       card.append(stop);
     }
 
