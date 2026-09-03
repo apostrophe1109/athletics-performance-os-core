@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_d74e32ad3d1c4243a06498539d75dba5",
-  "generatedAt": "2026-09-03T04:25:48.834Z",
-  "baseCommitSha": "64556c040347c23f90ef7d3ba39189b0abbe8c7d",
-  "changeReason": "サイト全体で種目マスター番号を非表示にし、休息・回復項目を高強度表示しないよう修正する。",
+  "deploymentId": "SITEDEPLOY_9ff3a2f76f6049eeae9ba6a186e3e31c",
+  "generatedAt": "2026-09-03T05:33:10.498Z",
+  "baseCommitSha": "57c9319f66fd818989f522a0564b54a7c71482f4",
+  "changeReason": "承認済みサイト修正Previewどおり、登録済み種目の強度表示をexerciseIdと種目マスターに統一する。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "cd14469f2d0dd942130d16d0ab46841c8151a4d04fbdcf5da637baf366b4b832"
+      "contentHash": "1c5858b9b84b652f1a0a2e97e3443f71f3d0c662ea8fbb299c381d270e91796e"
     }
   ]
 }

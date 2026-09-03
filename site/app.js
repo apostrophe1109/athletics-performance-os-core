@@ -103,6 +103,7 @@ async function loadDayData(date, { force = false, render = true } = {}) {
   );
   const sessions = result.records || [];
   replaceSessionsForRange(date, date, sessions);
+  await hydrateExerciseDetailsForIds(exerciseIdsFromSessions(sessions), { render: false });
   const context = { sessions, menuItems: [], menuItemsLoaded: false };
   state.dayCache.set(date, context);
   state.loadedSessionRanges.add(`${date}|${date}`);
@@ -125,6 +126,10 @@ async function hydrateDayMenuItems(date, sessions) {
     context.menuItems = results
       .flatMap(result => result.records || [])
       .sort((a, b) => Number(a.orderNo || 0) - Number(b.orderNo || 0));
+    await hydrateExerciseDetailsForIds(
+      context.menuItems.map(item => item.exerciseId || item.sourceExerciseId).filter(Boolean),
+      { render: false }
+    );
     state.dayCache.set(date, context);
     if (state.viewMode === "day" && state.selectedDate === date) {
       state.dayContext = context;
@@ -423,6 +428,53 @@ function hideExerciseMasterIds(value) {
     .trim();
 }
 
+function exerciseIdsFromSessions(sessions) {
+  const ids = [];
+  (Array.isArray(sessions) ? sessions : []).forEach(session => {
+    [session?.bridge, session?.requirements].filter(Boolean).forEach(value => {
+      for (const match of String(value).matchAll(/\bEX\d{2,4}\b/gi)) ids.push(match[0].toUpperCase());
+    });
+  });
+  return [...new Set(ids)];
+}
+
+function bridgeExerciseIdMap(raw) {
+  const map = new Map();
+  String(raw || "")
+    .split(/→|\n+/)
+    .map(value => value.trim())
+    .filter(Boolean)
+    .forEach(value => {
+      const match = value.match(/\b(EX\d{2,4})\b/i);
+      if (!match) return;
+      map.set(hideExerciseMasterIds(value), match[1].toUpperCase());
+    });
+  return map;
+}
+
+async function hydrateExerciseDetailsForIds(ids, { render = true } = {}) {
+  const unique = [...new Set((ids || []).filter(Boolean).map(value => String(value).toUpperCase()))];
+  const missing = unique.filter(id => !state.exerciseDetailCache.has(id));
+  if (!missing.length) return;
+  const results = await Promise.all(missing.map(id =>
+    api("getRecord", { entity: "exercises", key: id })
+      .then(result => result.record || null)
+      .catch(error => {
+        console.warn("exercise intensity master load failed", id, error);
+        return null;
+      })
+  ));
+  results.filter(Boolean).forEach(exercise => state.exerciseDetailCache.set(exercise.exerciseId, exercise));
+  if (render && state.viewMode === "day") renderDashboard();
+}
+
+function canonicalExerciseIntensityScore(exerciseId, text, session, explicitValue = "") {
+  const exercise = exerciseId ? state.exerciseDetailCache.get(String(exerciseId).toUpperCase()) : null;
+  const masterScore = itemIntensityScore(exercise?.intensity);
+  if (masterScore !== null) return masterScore;
+  return resolvedTrainingIntensity(text, session, explicitValue);
+}
+
 function isRecoveryOnlyItem(value) {
   const text = String(value || "").trim().replace(/\s+/g, "");
   if (!text) return false;
@@ -505,7 +557,8 @@ function dayMenuEntries(context, sessions) {
         detail,
         dose: doseText(item),
         section: inferDayMenuSection(searchable),
-        intensityScore: resolvedTrainingIntensity(
+        intensityScore: canonicalExerciseIntensityScore(
+          item.exerciseId || item.sourceExerciseId || null,
           searchable,
           sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null,
           item.intensity
@@ -518,20 +571,22 @@ function dayMenuEntries(context, sessions) {
     return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(entries), sessions);
   }
 
-  const bridgeEntries = sessions.flatMap(session => compactBridgeItems(session.bridge)
-    .map(value => {
-      const estimated = bridgeIntensityEstimate(value, session);
+  const bridgeEntries = sessions.flatMap(session => {
+    const exerciseIdMap = bridgeExerciseIdMap(session.bridge);
+    return compactBridgeItems(session.bridge).map(value => {
+      const exerciseId = exerciseIdMap.get(value) || null;
       return {
         title: value,
         detail: "",
         dose: "",
         section: inferDayMenuSection(value),
-        intensityScore: estimated,
+        intensityScore: canonicalExerciseIntensityScore(exerciseId, value, session),
         intensityEstimated: false,
-        exerciseId: null,
+        exerciseId,
         session
       };
-    }));
+    });
+  });
   if (bridgeEntries.length) return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(bridgeEntries), sessions);
 
   return appendRequirementExerciseEntries(sessions.map(session => ({
@@ -550,7 +605,6 @@ function appendRequirementExerciseEntries(entries, sessions) {
   const output = Array.isArray(entries) ? [...entries] : [];
   const sessionList = Array.isArray(sessions) ? sessions : [];
   const canonicalIndex = output.findIndex(item => item?.exerciseId === "EX064");
-  if (canonicalIndex >= 0) return output;
 
   const session = sessionList.find(item => /EX064|三段跳び接地ポジションアイソメトリック/.test(String(item?.requirements || "")));
   if (!session) return output;
@@ -567,6 +621,11 @@ function appendRequirementExerciseEntries(entries, sessions) {
     exerciseId: "EX064",
     session
   };
+
+  if (canonicalIndex >= 0) {
+    output.splice(canonicalIndex, 1, { ...output[canonicalIndex], ...entry });
+    return output;
+  }
 
   const matchingBridgeIndex = output.findIndex(item => /EX064|三段跳び接地ポジションアイソメトリック/.test(String(item?.title || "")));
   if (matchingBridgeIndex >= 0) {
