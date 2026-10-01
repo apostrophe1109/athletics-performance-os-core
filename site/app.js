@@ -94,28 +94,17 @@ async function loadDayData(date, { force = false, render = true } = {}) {
     return cached;
   }
 
-  const [result, easyTripleRuleResult] = await Promise.all([
-    records(
-      "sessions",
-      { sessionDate: date, sportProfileId: config.sportProfileId },
-      "sessionDate",
-      "ASC",
-      20
-    ),
-    api("getRecord", { entity: "trainingRules", key: "TDR031" }).catch(error => {
-      console.warn("Easyトリプル日次ルール取得失敗", error);
-      return null;
-    })
-  ]);
+  const result = await records(
+    "sessions",
+    { sessionDate: date, sportProfileId: config.sportProfileId },
+    "sessionDate",
+    "ASC",
+    20
+  );
   const sessions = result.records || [];
   replaceSessionsForRange(date, date, sessions);
   await hydrateExerciseDetailsForIds(exerciseIdsFromSessions(sessions), { render: false });
-  const context = {
-    sessions,
-    menuItems: [],
-    menuItemsLoaded: false,
-    easyTripleRule: easyTripleRuleResult?.record || null
-  };
+  const context = { sessions, menuItems: [], menuItemsLoaded: false };
   state.dayCache.set(date, context);
   state.loadedSessionRanges.add(`${date}|${date}`);
   state.dayContext = context;
@@ -579,11 +568,7 @@ function dayMenuEntries(context, sessions) {
         session: sessions.find(session => session.sessionId === item.sessionId) || sessions[0] || null
       };
     });
-    return appendDailyEasyTripleEntry(
-      appendRequirementExerciseEntries(groupHighSpeedConversionEntries(entries), sessions),
-      sessions,
-      context.easyTripleRule
-    );
+    return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(entries), sessions);
   }
 
   const bridgeEntries = sessions.flatMap(session => {
@@ -602,65 +587,18 @@ function dayMenuEntries(context, sessions) {
       };
     });
   });
-  if (bridgeEntries.length) return appendDailyEasyTripleEntry(
-    appendRequirementExerciseEntries(groupHighSpeedConversionEntries(bridgeEntries), sessions),
-    sessions,
-    context.easyTripleRule
-  );
+  if (bridgeEntries.length) return appendRequirementExerciseEntries(groupHighSpeedConversionEntries(bridgeEntries), sessions);
 
-  return appendDailyEasyTripleEntry(
-    appendRequirementExerciseEntries(sessions.map(session => ({
-      title: session.title || session.role || "セッション",
-      detail: session.purpose || "",
-      dose: sessionDoseText(session),
-      section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" ")),
-      intensityScore: sessionIntensity(session),
-      intensityEstimated: false,
-      exerciseId: null,
-      session
-    })), sessions),
-    sessions,
-    context.easyTripleRule
-  );
-}
-
-function appendDailyEasyTripleEntry(entries, sessions, rule) {
-  const output = Array.isArray(entries) ? [...entries] : [];
-  const session = Array.isArray(sessions) ? sessions[0] : null;
-  const date = String(session?.sessionDate || "");
-  const role = String(session?.role || "").toUpperCase();
-  if (!session || !rule || rule.status !== "ACTIVE") return output;
-  if (date < String(rule.effectiveFrom || "") || date > String(rule.effectiveTo || "")) return output;
-  if (/\bREST\b|COMPLETE REST/.test(role)) return output;
-  if (output.some(item => /Easyトリプル|イージートリプル/i.test(String(item?.title || "")))) return output;
-
-  const competition = /COMPETITION/.test(role);
-  const jumpTechnical = /JUMP|FULL APPROACH|TECHNICAL/.test(role);
-  const recoveryOrTaper = /RECOVERY|ACTIVE REST|TAPER|PRECOMPETITION/.test(role);
-  const dose = competition
-    ? "1本｜70〜80％｜3〜5分完全回復"
-    : jumpTechnical
-      ? "1〜2本｜70〜80％｜3〜5分完全回復"
-      : recoveryOrTaper
-        ? "1本｜70〜75％｜3〜5分完全回復"
-        : "1本｜70〜80％｜3〜5分完全回復";
-  const entry = {
-    title: "Easyトリプル",
-    detail: competition
-      ? "ドリル・神経プライマーの感覚を公式試技へつなぐ"
-      : "ドリルで得た接地・支持感覚を三段跳の3局面へ統合してからメインへ進む",
-    dose,
-    section: "primer",
-    intensityScore: resolvedTrainingIntensity("Easyトリプル 低負荷 三段跳 感覚統合", session, recoveryOrTaper ? "LOW" : "MEDIUM"),
+  return appendRequirementExerciseEntries(sessions.map(session => ({
+    title: session.title || session.role || "セッション",
+    detail: session.purpose || "",
+    dose: sessionDoseText(session),
+    section: inferDayMenuSection([session.role, session.title, session.purpose].filter(Boolean).join(" ")),
+    intensityScore: sessionIntensity(session),
     intensityEstimated: false,
-    exerciseId: "EX001",
+    exerciseId: null,
     session
-  };
-
-  const mainIndex = output.findIndex(item => /(?:^|\s)(?:60m|80m|100m|120m|150m)\b|全助走|トリプル×|跳躍×|ハングクリーン|バックスクワット|スプリットスクワット|RDL/.test(String(item?.title || "")));
-  const insertAt = mainIndex >= 0 ? mainIndex : output.length;
-  output.splice(insertAt, 0, entry);
-  return output;
+  })), sessions);
 }
 
 function appendRequirementExerciseEntries(entries, sessions) {

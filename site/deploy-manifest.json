@@ -1,14 +1,13 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_5368254740484232a1501898b63c87b5",
-  "generatedAt": "2026-10-01T00:45:56.417Z",
-  "baseCommitSha": "57c465cd7381650bf50d599e1a2b793f54499892",
-  "changeReason": "承認済み：TDR031をAPOS Viewへ反映し、10/1〜10/25のREST日を除く各日にEasyトリプルを最適位置で表示する",
+  "deploymentId": "SITEDEPLOY_460a710ff7eb4397949f46efa616d585",
+  "generatedAt": "2026-10-01T08:04:03.509Z",
+  "baseCommitSha": "7562d9997694faaae0d6c64c9324d0082599fd8e",
+  "changeReason": "ロールバック承認継続：公開サイト閲覧不能の復旧を優先し、直前のEasyトリプルView変更のみを戻す。Sheets正本データとTDR031は維持する。",
   "files": [
     {
-      "path": "site/app.js",
-      "operation": "UPSERT",
-      "contentHash": "2addb49fca6179902b8ed2d5970d737d49e89138bd75fd7a8ae79a1d53b35295"
+      "operation": "ROLLBACK",
+      "rollbackToCommitSha": "57c465cd7381650bf50d599e1a2b793f54499892"
     }
   ]
 }
