@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_9ff3a2f76f6049eeae9ba6a186e3e31c",
-  "generatedAt": "2026-09-03T05:33:10.498Z",
-  "baseCommitSha": "57c9319f66fd818989f522a0564b54a7c71482f4",
-  "changeReason": "承認済みサイト修正Previewどおり、登録済み種目の強度表示をexerciseIdと種目マスターに統一する。",
+  "deploymentId": "SITEDEPLOY_5368254740484232a1501898b63c87b5",
+  "generatedAt": "2026-10-01T00:45:56.417Z",
+  "baseCommitSha": "57c465cd7381650bf50d599e1a2b793f54499892",
+  "changeReason": "承認済み：TDR031をAPOS Viewへ反映し、10/1〜10/25のREST日を除く各日にEasyトリプルを最適位置で表示する",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "1c5858b9b84b652f1a0a2e97e3443f71f3d0c662ea8fbb299c381d270e91796e"
+      "contentHash": "2addb49fca6179902b8ed2d5970d737d49e89138bd75fd7a8ae79a1d53b35295"
     }
   ]
 }
