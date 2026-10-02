@@ -1,14 +1,49 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_80686ea421e141fc91b2afbe28a67576",
-  "generatedAt": "2026-08-31T06:12:55.384Z",
-  "baseCommitSha": "69ec306e0698f48890762275fdfb712b3583deca",
-  "changeReason": "承認済み種目ID連番化を完全完了するため旧EX_202608長形式ID削除専用の限定例外を適用",
+  "deploymentId": "SITEDEPLOY_51f6183136b840e6a6b220667a42e772",
+  "generatedAt": "2026-10-02T03:35:54.086Z",
+  "baseCommitSha": "957ae00b8c2861309f55cf8ba53755ee9f4ad35d",
+  "changeReason": "APOS 3.0基盤の実装を承認。現行Custom GPT・30 Actions・Sheets正本を維持したまま、OAuth必須MCP endpoint、portable Plugin manifest、4 Skills、runtime policy version情報を追加する。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "a96ec274f65dfee0a506445f2b1900da78a7b0181c0213706fb06cc3f1f122e1"
+      "contentHash": "79aae704c869b7efa78c41f46a9f3df03bedf7c66701bde5796425c67def563a"
+    },
+    {
+      "path": "system/runtime-policy.json",
+      "operation": "UPSERT",
+      "contentHash": "b4d4975bb31606986096874762e3a80365799271b4b91ed65e7b39241c8a0876"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/plugin.json",
+      "operation": "UPSERT",
+      "contentHash": "b5bc995fed9059525a064ed6c292da1a7c8ca359c5e7eea521146482c363e6c7"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/mcp.json",
+      "operation": "UPSERT",
+      "contentHash": "c58d1ff84c2b958903e1218db82ba7003acc6c1c68bbb88e057d366b6b5576c4"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/skills/apos-goal-to-day/SKILL.md",
+      "operation": "UPSERT",
+      "contentHash": "af352966605d9f260c3544bb77fa4bffe63d1d710914b29e0982303b5760b626"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/skills/apos-training-data/SKILL.md",
+      "operation": "UPSERT",
+      "contentHash": "769ea95ee80de11db675d152c264fa73a50e63dd8fcc8ca2c52da746512686e3"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/skills/apos-view-control/SKILL.md",
+      "operation": "UPSERT",
+      "contentHash": "a2f2dfddd60f2f703d9ce9f7d77ba5d0937be1ebafa14f5b73ff409998c5f22f"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/skills/apos-system-maintenance/SKILL.md",
+      "operation": "UPSERT",
+      "contentHash": "e80a79a70f0fded15af0d678fe5eedb1b7564d709702824e60da2ad525fb56dd"
     }
   ]
 }

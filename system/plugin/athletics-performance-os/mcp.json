@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "apos": {
+      "type": "streamable-http",
+      "url": "https://athletics-performance-os-gateway.t-f-hjtjyh.workers.dev/mcp"
+    }
+  }
+}

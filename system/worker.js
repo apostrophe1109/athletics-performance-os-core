@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.4.24";
+const VERSION = "1.5.0";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 32000;
@@ -129,6 +129,12 @@ export default {
       }
 
       const url = new URL(request.url);
+      if (request.method === "GET" && (url.pathname === "/.well-known/oauth-protected-resource" || url.pathname === "/.well-known/oauth-protected-resource/mcp")) {
+        return mcpProtectedResourceMetadata(request, env, requestId, cors);
+      }
+      if (request.method === "POST" && url.pathname === "/mcp") {
+        return handleMcp(request, env, requestId, cors);
+      }
       if (request.method === "POST" && url.pathname === "/auth/login") {
         if (origin && !isAllowedOrigin(origin, env)) return json({ success: false, code: "ORIGIN_NOT_ALLOWED" }, 403, requestId, cors);
         return handleWebLogin(request, env, requestId, cors);
@@ -199,6 +205,295 @@ export default {
   },
 };
 
+const MCP_VERSION = "1.0.0";
+const MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
+const MCP_SCOPES = Object.freeze({ read: "apos.read", write: "apos.write", admin: "apos.admin" });
+let mcpJwksCache = { url: "", expiresAt: 0, keys: [] };
+
+function mcpConfig(env) {
+  const issuer = String(env.APOS_MCP_OAUTH_ISSUER || "").trim().replace(/\/+$/, "");
+  const resource = String(env.APOS_MCP_RESOURCE || "").trim().replace(/\/+$/, "");
+  const jwksUrl = String(env.APOS_MCP_JWKS_URL || (issuer ? `${issuer}/.well-known/jwks.json` : "")).trim();
+  const allowedEmails = csv(env.APOS_MCP_ALLOWED_EMAILS).map(value => value.toLowerCase());
+  const allowedSubjects = csv(env.APOS_MCP_ALLOWED_SUBJECTS);
+  return { issuer, resource, jwksUrl, allowedEmails, allowedSubjects };
+}
+
+function mcpConfigReady(env) {
+  const config = mcpConfig(env);
+  return Boolean(config.issuer && config.resource && config.jwksUrl && (config.allowedEmails.length || config.allowedSubjects.length));
+}
+
+function mcpResourceMetadataUrl(request) {
+  const url = new URL(request.url);
+  return `${url.origin}/.well-known/oauth-protected-resource`;
+}
+
+function mcpProtectedResourceMetadata(request, env, requestId, cors) {
+  const config = mcpConfig(env);
+  if (!mcpConfigReady(env)) {
+    return json({ success: false, code: "MCP_AUTH_NOT_CONFIGURED", error: "APOS MCP OAuth設定が未完了です。" }, 503, requestId, cors);
+  }
+  return new Response(JSON.stringify({
+    resource: config.resource,
+    authorization_servers: [config.issuer],
+    scopes_supported: [MCP_SCOPES.read, MCP_SCOPES.write, MCP_SCOPES.admin]
+  }), { status: 200, headers: securityHeaders(cors) });
+}
+
+async function mcpJwks(config) {
+  if (mcpJwksCache.url === config.jwksUrl && mcpJwksCache.expiresAt > Date.now() && mcpJwksCache.keys.length) return mcpJwksCache.keys;
+  const response = await fetch(config.jwksUrl, { headers: { accept: "application/json" }, cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!response.ok) throw Object.assign(new Error("MCP OAuth JWKSを取得できません。"), { code: "MCP_JWKS_FETCH_FAILED", status: 502 });
+  const payload = await response.json().catch(() => null);
+  const keys = Array.isArray(payload?.keys) ? payload.keys : [];
+  if (!keys.length) throw Object.assign(new Error("MCP OAuth JWKSが空です。"), { code: "MCP_JWKS_EMPTY", status: 502 });
+  mcpJwksCache = { url: config.jwksUrl, expiresAt: Date.now() + 3600000, keys };
+  return keys;
+}
+
+async function verifyMcpJwt(token, env) {
+  const config = mcpConfig(env);
+  if (!mcpConfigReady(env)) return { ok: false, code: "MCP_AUTH_NOT_CONFIGURED", status: 503 };
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return { ok: false, code: "MCP_TOKEN_INVALID", status: 401 };
+  let header;
+  let payload;
+  try {
+    header = JSON.parse(base64UrlText(parts[0]));
+    payload = JSON.parse(base64UrlText(parts[1]));
+  } catch {
+    return { ok: false, code: "MCP_TOKEN_INVALID", status: 401 };
+  }
+  if (header.alg !== "RS256" || !header.kid) return { ok: false, code: "MCP_TOKEN_ALG_UNSUPPORTED", status: 401 };
+  const now = Math.floor(Date.now() / 1000);
+  if (!payload.exp || payload.exp <= now || (payload.nbf && payload.nbf > now + 60)) return { ok: false, code: "MCP_TOKEN_EXPIRED", status: 401 };
+  if (String(payload.iss || "").replace(/\/+$/, "") !== config.issuer) return { ok: false, code: "MCP_TOKEN_ISSUER_MISMATCH", status: 401 };
+  const audiences = Array.isArray(payload.aud) ? payload.aud.map(String) : [String(payload.aud || "")];
+  if (!audiences.includes(config.resource)) return { ok: false, code: "MCP_TOKEN_AUDIENCE_MISMATCH", status: 401 };
+  const keys = await mcpJwks(config);
+  const jwk = keys.find(key => key.kid === header.kid);
+  if (!jwk) {
+    mcpJwksCache.expiresAt = 0;
+    const refreshed = await mcpJwks(config);
+    const refreshedJwk = refreshed.find(key => key.kid === header.kid);
+    if (!refreshedJwk) return { ok: false, code: "MCP_TOKEN_KEY_NOT_FOUND", status: 401 };
+    return verifyMcpJwtWithKey(parts, payload, refreshedJwk, config);
+  }
+  return verifyMcpJwtWithKey(parts, payload, jwk, config);
+}
+
+async function verifyMcpJwtWithKey(parts, payload, jwk, config) {
+  try {
+    const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const verified = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, base64UrlBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    if (!verified) return { ok: false, code: "MCP_TOKEN_SIGNATURE_INVALID", status: 401 };
+    const email = String(payload.email || payload.preferred_username || "").toLowerCase();
+    const subject = String(payload.sub || "");
+    const emailAllowed = config.allowedEmails.length && config.allowedEmails.includes(email);
+    const subjectAllowed = config.allowedSubjects.length && config.allowedSubjects.includes(subject);
+    if (!emailAllowed && !subjectAllowed) return { ok: false, code: "MCP_IDENTITY_NOT_ALLOWED", status: 403 };
+    const scopeValues = Array.isArray(payload.scope) ? payload.scope.map(String) : Array.isArray(payload.scp) ? payload.scp.map(String) : String(payload.scope || "").split(/\s+/).filter(Boolean);
+    const scopes = new Set(scopeValues);
+    return { ok: true, actor: email || subject || "mcp-user", email, subject, scopes };
+  } catch {
+    return { ok: false, code: "MCP_TOKEN_VERIFY_FAILED", status: 401 };
+  }
+}
+
+function mcpBearerToken(request) {
+  const authorization = String(request.headers.get("authorization") || "");
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || "";
+}
+
+function mcpAuthChallenge(request, scopes) {
+  return `Bearer resource_metadata="${mcpResourceMetadataUrl(request)}", scope="${scopes.join(" ")}"`;
+}
+
+async function authenticateMcp(request, env, requiredScopes) {
+  const token = mcpBearerToken(request);
+  if (!token) return { ok: false, code: "MCP_AUTH_REQUIRED", status: 401 };
+  const auth = await verifyMcpJwt(token, env);
+  if (!auth.ok) return auth;
+  const missing = requiredScopes.filter(scope => !auth.scopes.has(scope));
+  if (missing.length) return { ok: false, code: "MCP_SCOPE_REQUIRED", status: 403, missingScopes: missing };
+  return auth;
+}
+
+function mcpHeaders(cors = {}) { return { ...securityHeaders(cors), "content-type": "application/json; charset=utf-8" }; }
+function mcpRpcResponse(id, result, cors = {}) { return new Response(JSON.stringify({ jsonrpc: "2.0", id, result }), { status: 200, headers: mcpHeaders(cors) }); }
+function mcpRpcError(id, code, message, cors = {}, data = undefined) {
+  const error = { code, message };
+  if (data !== undefined) error.data = data;
+  return new Response(JSON.stringify({ jsonrpc: "2.0", id, error }), { status: 200, headers: mcpHeaders(cors) });
+}
+function mcpToolResult(value, isError = false) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  const result = { content: [{ type: "text", text }], structuredContent: typeof value === "object" && value !== null ? value : { value } };
+  if (isError) result.isError = true;
+  return result;
+}
+function mcpTool(name, title, description, inputSchema, scopes, annotations) {
+  return { name, title, description, inputSchema, securitySchemes: [{ type: "oauth2", scopes }], annotations: { readOnlyHint: Boolean(annotations?.readOnlyHint), destructiveHint: Boolean(annotations?.destructiveHint), openWorldHint: false } };
+}
+
+function mcpTools() {
+  const entityEnum = ["overview","settings","sportProfiles","governanceRules","trainingRules","exercises","cycles","events","sessions","menuItems","executions","reviews","measurements","media","proposals","changes","batches","idLedger","recurrenceRules","migrationAudit","dictionary","options"];
+  const objectSchema = { type: "object", additionalProperties: true };
+  return [
+    mcpTool("apos_status", "APOS status", "Use this to inspect APOS health, inventory, or schema without changing state.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["health","inventory","schema"] } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_training_context", "Training context", "Use this for today's or a specified day's active rules, cycle, sessions, recent executions, reviews, measurements, and events.", { type: "object", additionalProperties: false, properties: { date: { type: "string", format: "date" }, historyDays: { type: "integer", minimum: 1, maximum: 28, default: 14 } } }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_exercise", "Exercise master", "Use this to search registered exercises or retrieve one exact exercise record. Search before proposing a new exercise.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["search","get"] }, query: { type: "string" }, exerciseId: { type: "string" }, includeArchived: { type: "boolean", default: false }, limit: { type: "integer", minimum: 1, maximum: 100, default: 20 } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_canonical_read", "Canonical data read", "Use this to retrieve one canonical record by key or query canonical records by filters. It never writes.", { type: "object", additionalProperties: false, properties: { entity: { type: "string", enum: entityEnum }, key: { type: "string" }, filters: objectSchema, sortBy: { type: "string" }, sortDirection: { type: "string", enum: ["ASC","DESC"], default: "ASC" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 500, default: 100 } }, required: ["entity"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_view_read", "APOS View read", "Use this to inspect the current View layout, source tree/file, or deployment status without changing GitHub.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["layout","tree","file","deployment"] }, payload: objectSchema }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_preview", "Preview APOS change", "Use this to create a canonical or View preview. Preview is read-only and must precede every apply.", { type: "object", additionalProperties: false, properties: { domain: { type: "string", enum: ["canonical","view"] }, kind: { type: "string", enum: ["mutation","batch","rollback","backup","layout","source"] }, payload: objectSchema }, required: ["domain","kind","payload"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_apply", "Apply approved APOS change", "Use this only after a matching preview and explicit user approval. It applies canonical or View changes and is never safe to auto-retry after timeout.", { type: "object", additionalProperties: false, properties: { domain: { type: "string", enum: ["canonical","view"] }, lockedPreview: objectSchema, lockedPreviewToken: { type: "string" }, approvalHash: { type: "string", pattern: "^[A-Fa-f0-9]{64}$" }, changeReason: { type: "string", minLength: 3, maxLength: 500 } }, required: ["domain","approvalHash","changeReason"] }, [MCP_SCOPES.write], { destructiveHint: true }),
+    mcpTool("apos_system_read", "APOS system read", "Use this for maintenance capabilities, system source, runtime policy, deployment status, or diagnostics. It never writes.", { type: "object", additionalProperties: false, properties: { operation: { type: "string" }, payload: objectSchema }, required: ["operation"] }, [MCP_SCOPES.admin], { readOnlyHint: true }),
+    mcpTool("apos_system_preview", "Preview APOS system change", "Use this to preview Worker, Apps Script, contract, policy, or other system maintenance changes. Never apply in the same maintenance step without a new explicit user approval after preview.", { type: "object", additionalProperties: false, properties: { operation: { type: "string" }, payload: objectSchema }, required: ["operation","payload"] }, [MCP_SCOPES.admin], { readOnlyHint: true }),
+    mcpTool("apos_system_apply", "Apply approved APOS system change", "Use this only after a maintenance preview has been shown and the user explicitly approves that exact maintenance change. Never auto-retry.", { type: "object", additionalProperties: false, properties: { operation: { type: "string" }, lockedPreviewToken: { type: "string" }, lockedPreview: objectSchema, approvalHash: { type: "string", pattern: "^[A-Fa-f0-9]{64}$" }, changeReason: { type: "string", minLength: 3, maxLength: 500 } }, required: ["operation","approvalHash","changeReason"] }, [MCP_SCOPES.admin], { destructiveHint: true })
+  ];
+}
+
+function mcpApproval(approvalHash, changeReason, lockedPreview = null) {
+  const approval = { approved: true, approvedBy: "山下祐樹", approvedAt: new Date().toISOString(), nonce: `MCP_${crypto.randomUUID().replaceAll("-", "")}`, changeReason: String(changeReason || "").trim(), approvalHash: String(approvalHash || "").trim() };
+  if (lockedPreview?.previewType === "SITE_SOURCE" && Array.isArray(lockedPreview.changes) && lockedPreview.changes.some(item => item.operation === "DELETE")) approval.destructiveApproval = "SOURCE_DELETE_APPROVED";
+  else if (lockedPreview?.previewType === "MUTATION" && lockedPreview.destructive === true) approval.destructiveApproval = "DELETE_APPROVED";
+  return approval;
+}
+
+async function runMcpTool(name, args, auth, env, requestId) {
+  const actor = { id: auth.actor, source: "MCP_OAUTH" };
+  if (name === "apos_status") {
+    if (args.mode === "health") return callAppsScript("health", {}, actor, env, true, requestId);
+    if (args.mode === "inventory") return callAppsScript("inventory", {}, actor, env, true, requestId);
+    if (args.mode === "schema") return callAppsScript("validateSchema", {}, actor, env, true, requestId);
+    throw Object.assign(new Error("modeが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+  }
+  if (name === "apos_training_context") return callAppsScript("getTrainingContext", { ...(args.date ? { date: args.date } : {}), ...(args.historyDays ? { historyDays: args.historyDays } : {}) }, actor, env, true, requestId);
+  if (name === "apos_exercise") {
+    if (args.mode === "search") {
+      if (!String(args.query || "").trim()) throw Object.assign(new Error("searchにはqueryが必要です。"), { code: "MCP_ARGUMENT_REQUIRED", status: 400 });
+      return callAppsScript("searchExercises", { query: String(args.query), includeArchived: Boolean(args.includeArchived), limit: Number(args.limit || 20) }, actor, env, true, requestId);
+    }
+    if (args.mode === "get") {
+      if (!String(args.exerciseId || "").trim()) throw Object.assign(new Error("getにはexerciseIdが必要です。"), { code: "MCP_ARGUMENT_REQUIRED", status: 400 });
+      return callAppsScript("getRecord", { entity: "exercises", key: String(args.exerciseId) }, actor, env, true, requestId);
+    }
+    throw Object.assign(new Error("modeが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+  }
+  if (name === "apos_canonical_read") {
+    if (String(args.key || "").trim()) return callAppsScript("getRecord", { entity: args.entity, key: String(args.key) }, actor, env, true, requestId);
+    return callAppsScript("getRecords", { entity: args.entity, ...(isPlainObject(args.filters) ? { filters: args.filters } : {}), ...(args.sortBy ? { sortBy: args.sortBy } : {}), ...(args.sortDirection ? { sortDirection: args.sortDirection } : {}), ...(Number.isInteger(args.offset) ? { offset: args.offset } : {}), ...(Number.isInteger(args.limit) ? { limit: args.limit } : {}) }, actor, env, true, requestId);
+  }
+  if (name === "apos_view_read") {
+    const payload = isPlainObject(args.payload) ? args.payload : {};
+    if (args.mode === "layout") return getSiteLayout(env);
+    if (args.mode === "tree") return getSiteSourceTree(payload, env);
+    if (args.mode === "file") return getSiteSourceFile(payload, env);
+    if (args.mode === "deployment") return getSiteDeploymentStatus(payload, env);
+    throw Object.assign(new Error("modeが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+  }
+  if (name === "apos_preview") {
+    const payload = isPlainObject(args.payload) ? args.payload : {};
+    if (args.domain === "canonical") {
+      const map = { mutation: "previewMutation", batch: "previewBatch", rollback: "previewRollback", backup: "previewBackup" };
+      const action = map[args.kind];
+      if (!action) throw Object.assign(new Error("canonical kindが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+      return callAppsScript(action, payload, actor, env, true, requestId);
+    }
+    if (args.domain === "view") {
+      if (args.kind === "layout") return previewSiteLayoutChange(payload, auth, env);
+      if (args.kind === "source") return previewSiteSourceChange(payload, auth, env);
+      if (args.kind === "rollback") return previewSiteSourceRollback(payload, auth, env);
+      throw Object.assign(new Error("view kindが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+    }
+    throw Object.assign(new Error("domainが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+  }
+  if (name === "apos_apply") {
+    const approval = mcpApproval(args.approvalHash, args.changeReason, args.lockedPreview || null);
+    if (args.domain === "canonical") {
+      const locked = args.lockedPreview;
+      if (!isPlainObject(locked)) throw Object.assign(new Error("canonical applyにはlockedPreviewが必要です。"), { code: "LOCKED_PREVIEW_REQUIRED", status: 400 });
+      let action;
+      if (locked.previewType === "BATCH") action = "applyBatch";
+      else if (locked.previewType === "BACKUP") action = "createBackup";
+      else if (locked.previewType === "MUTATION" && locked.rollbackOfChangeId) action = "applyRollback";
+      else if (locked.previewType === "MUTATION") action = "applyMutation";
+      else throw Object.assign(new Error("未対応のcanonical previewTypeです。"), { code: "MCP_PREVIEW_TYPE_UNSUPPORTED", status: 400 });
+      return callAppsScript(action, { lockedPreview: locked, approval }, actor, env, false, requestId);
+    }
+    if (args.domain === "view") {
+      const body = { ...(args.lockedPreviewToken ? { lockedPreviewToken: args.lockedPreviewToken } : {}), ...(isPlainObject(args.lockedPreview) ? { lockedPreview: args.lockedPreview } : {}), approval };
+      const previewType = args.lockedPreview?.previewType || (args.lockedPreviewToken ? await mcpPreviewTypeFromToken(args.lockedPreviewToken, env) : "");
+      if (previewType === "SITE_LAYOUT") return applySiteLayoutChange(body, auth, env);
+      if (previewType === "SITE_SOURCE") return applySiteSourceChange(body, auth, env);
+      if (previewType === "SITE_SOURCE_ROLLBACK") return applySiteSourceRollback(body, auth, env);
+      throw Object.assign(new Error("未対応のView previewTypeです。"), { code: "MCP_PREVIEW_TYPE_UNSUPPORTED", status: 400 });
+    }
+    throw Object.assign(new Error("domainが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });
+  }
+  if (name === "apos_system_read") {
+    if (String(args.operation || "").toUpperCase() === "CAPABILITIES") return getMaintenanceCapabilities(env);
+    return maintenanceRead({ operation: args.operation, payload: isPlainObject(args.payload) ? args.payload : {} }, auth, env);
+  }
+  if (name === "apos_system_preview") return maintenancePreview({ operation: args.operation, payload: isPlainObject(args.payload) ? args.payload : {} }, auth, env);
+  if (name === "apos_system_apply") {
+    const approval = mcpApproval(args.approvalHash, args.changeReason, args.lockedPreview || null);
+    const payload = { ...(args.lockedPreviewToken ? { lockedPreviewToken: args.lockedPreviewToken } : {}), ...(isPlainObject(args.lockedPreview) ? { lockedPreview: args.lockedPreview } : {}), approval };
+    return maintenanceApply({ operation: args.operation, payload }, auth, env);
+  }
+  throw Object.assign(new Error("未対応のMCP toolです。"), { code: "MCP_TOOL_NOT_FOUND", status: 404 });
+}
+
+async function mcpPreviewTypeFromToken(token, env) {
+  for (const type of ["SITE_LAYOUT", "SITE_SOURCE", "SITE_SOURCE_ROLLBACK"]) {
+    try { return (await readLockedPreviewFromToken(token, type, env)).locked.previewType; }
+    catch (error) { if (!/TYPE_MISMATCH/.test(String(error?.code || ""))) continue; }
+  }
+  return "";
+}
+
+function requiredMcpScopesForTool(name) {
+  if (["apos_status","apos_training_context","apos_exercise","apos_canonical_read","apos_view_read","apos_preview"].includes(name)) return [MCP_SCOPES.read];
+  if (name === "apos_apply") return [MCP_SCOPES.write];
+  if (["apos_system_read","apos_system_preview","apos_system_apply"].includes(name)) return [MCP_SCOPES.admin];
+  return [MCP_SCOPES.read];
+}
+
+async function handleMcp(request, env, requestId, cors) {
+  if (!mcpConfigReady(env)) return json({ success: false, code: "MCP_AUTH_NOT_CONFIGURED", error: "APOS MCP OAuth設定が未完了です。" }, 503, requestId, cors);
+  let payload;
+  try { payload = await request.json(); }
+  catch { return mcpRpcError(null, -32700, "Parse error", cors); }
+  if (!isPlainObject(payload) || payload.jsonrpc !== "2.0" || typeof payload.method !== "string") return mcpRpcError(payload?.id ?? null, -32600, "Invalid Request", cors);
+  if (payload.method === "notifications/initialized") return new Response(null, { status: 202, headers: mcpHeaders(cors) });
+  if (payload.method === "initialize") {
+    const auth = await authenticateMcp(request, env, [MCP_SCOPES.read]);
+    if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, [MCP_SCOPES.read]) } });
+    return mcpRpcResponse(payload.id ?? null, { protocolVersion: String(payload.params?.protocolVersion || MCP_DEFAULT_PROTOCOL_VERSION), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "athletics-performance-os", version: MCP_VERSION }, instructions: "APOS is private. Read current canonical state before decisions. Every write requires Preview before Apply. Never auto-retry writes after timeout. Verify every successful Apply with an independent read-back." }, cors);
+  }
+  if (payload.method === "ping") return mcpRpcResponse(payload.id ?? null, {}, cors);
+  if (payload.method === "tools/list") {
+    const auth = await authenticateMcp(request, env, [MCP_SCOPES.read]);
+    if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, [MCP_SCOPES.read]) } });
+    return mcpRpcResponse(payload.id ?? null, { tools: mcpTools() }, cors);
+  }
+  if (payload.method === "tools/call") {
+    const name = String(payload.params?.name || "");
+    const scopes = requiredMcpScopesForTool(name);
+    const auth = await authenticateMcp(request, env, scopes);
+    if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, scopes) } });
+    try {
+      const result = await runMcpTool(name, isPlainObject(payload.params?.arguments) ? payload.params.arguments : {}, auth, env, requestId);
+      return mcpRpcResponse(payload.id ?? null, mcpToolResult(result), cors);
+    } catch (error) {
+      return mcpRpcResponse(payload.id ?? null, mcpToolResult({ success: false, code: error?.code || "MCP_TOOL_FAILED", error: safeErrorMessage(error) }, true), cors);
+    }
+  }
+  return mcpRpcError(payload.id ?? null, -32601, "Method not found", cors);
+}
+
 async function handleHealth(env, requestId, cors) {
   const configured = {
     appsScriptUrl: Boolean(env.APOS_APPS_SCRIPT_URL),
@@ -216,6 +511,7 @@ async function handleHealth(env, requestId, cors) {
     maintenanceRead: Boolean(env.APOS_GITHUB_OWNER && env.APOS_GITHUB_REPO),
     maintenanceWrite: Boolean(env.APOS_GITHUB_OWNER && env.APOS_GITHUB_REPO && env.APOS_GITHUB_TOKEN),
     maintenanceDeployObserve: Boolean(env.APOS_GITHUB_OWNER && env.APOS_GITHUB_REPO && env.APOS_GITHUB_TOKEN),
+    mcpOAuthReady: mcpConfigReady(env),
   };
   configured.clientAuth = configured.clientToken || configured.access || configured.webAuth;
 

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "athletics-performance-os",
+  "version": "0.1.0",
+  "description": "Private control plane for Athletics Performance OS: Goal-to-Day training decisions, canonical data operations, APOS View control, and audited maintenance.",
+  "author": {
+    "name": "山下祐樹"
+  },
+  "homepage": "https://apostrophe1109.github.io/athletics-performance-os-core/",
+  "repository": "https://github.com/apostrophe1109/athletics-performance-os-core",
+  "keywords": ["athletics", "triple-jump", "training", "performance", "APOS"]
+}
