@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "system": "Athletics Performance OS",
-  "policyVersion": "2026-10-02",
+  "policyVersion": "2026-10-04",
   "canonicalEntities": [
     "overview",
     "settings",
@@ -61,12 +61,13 @@
     "Exact non-destructive inline apply intent may satisfy user approval without a second confirmation turn; Preview still occurs before Apply.",
     "After technical failure or Preview expiry, an identical re-preview may continue the same user approval intent only after canonical re-read confirms identical semantic scope. A fresh internal approval envelope must use the latest approvalHash, a post-preview approvedAt, and a fresh nonce.",
     "Preview expiry remains an internal safety control and is normally not presented to the user.",
-    "APOS Plugin migration runs in parallel with the existing Custom GPT. Do not migrate the production GPT until MCP OAuth, tool scans, golden prompts, write safety, View deployment verification, rollback, backup, and maintenance acceptance tests all pass."
+    "APOS Plugin migration runs in parallel with the existing Custom GPT. Do not migrate the production GPT until MCP OAuth, tool scans, golden prompts, write safety, View deployment verification, rollback, backup, and maintenance acceptance tests all pass.",
+    "Plugin Skills, ChatGPT-native UI, Voice workflows, Work monitoring, and Health integration must remain isolated from the GitHub Pages site bundle by default. They must not add JavaScript, CSS, assets, or extra network calls to site/ unless a separate site-performance Preview explicitly demonstrates the need and acceptable impact."
   ],
   "runtimeVersions": {
-    "worker": "1.5.0",
-    "plugin": "0.1.0",
-    "mcpContract": "1.0.0",
+    "worker": "1.5.1",
+    "plugin": "0.2.0",
+    "mcpContract": "1.1.0",
     "appsScriptApi": "1.2.5",
     "canonicalSchema": "1.1.0",
     "openapi": "2.5.2",

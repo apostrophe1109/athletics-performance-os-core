@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.4.24
+ * Version: 1.5.1
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 32000;
@@ -205,9 +205,11 @@ export default {
   },
 };
 
-const MCP_VERSION = "1.0.0";
+const MCP_VERSION = "1.1.0";
 const MCP_DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 const MCP_SCOPES = Object.freeze({ read: "apos.read", write: "apos.write", admin: "apos.admin" });
+const MCP_SKILL_ROOT = "system/plugin/athletics-performance-os/skills";
+const MCP_SKILL_NAMES = Object.freeze(["apos-goal-to-day", "apos-training-data", "apos-view-control", "apos-system-maintenance"]);
 let mcpJwksCache = { url: "", expiresAt: 0, keys: [] };
 
 function mcpConfig(env) {
@@ -338,10 +340,87 @@ function mcpTool(name, title, description, inputSchema, scopes, annotations) {
   return { name, title, description, inputSchema, securitySchemes: [{ type: "oauth2", scopes }], annotations: { readOnlyHint: Boolean(annotations?.readOnlyHint), destructiveHint: Boolean(annotations?.destructiveHint), openWorldHint: false } };
 }
 
+function mcpProfileTool() {
+  return {
+    name: "apos_profile",
+    title: "APOS profile",
+    description: "Return the APOS profile represented by the current authenticated credentials. The opaque id remains stable across token refresh and reconnection.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    outputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: {
+        id: { type: "string", minLength: 1, pattern: "\\S", description: "Opaque stable APOS profile identifier." },
+        email: { type: "string", description: "Authenticated email address when supplied by the OAuth provider." },
+        nickname: { type: "string", description: "Human-readable APOS connection label." }
+      },
+      required: ["id"],
+      additionalProperties: false
+    },
+    securitySchemes: [{ type: "oauth2", scopes: [MCP_SCOPES.read] }],
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: { "openai/profile": true }
+  };
+}
+
+function mcpSkillUri(name) {
+  return `skill://athletics-performance-os/${name}/SKILL.md`;
+}
+
+function mcpSkillFrontmatter(content) {
+  const match = String(content || "").match(/^---\\s*\\n([\\s\\S]*?)\\n---(?:\\s*\\n|$)/);
+  if (!match) throw Object.assign(new Error("SKILL.md front matterを解析できません。"), { code: "MCP_SKILL_FRONTMATTER_INVALID", status: 500 });
+  const frontmatter = {};
+  for (const line of match[1].split(/\\r?\\n/)) {
+    const field = line.match(/^([A-Za-z0-9_-]+):\\s*(.*)$/);
+    if (!field) continue;
+    let value = field[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    frontmatter[field[1]] = value;
+  }
+  if (!frontmatter.name || !frontmatter.description) throw Object.assign(new Error("SKILL.mdにはnameとdescriptionが必要です。"), { code: "MCP_SKILL_FRONTMATTER_REQUIRED", status: 500 });
+  return frontmatter;
+}
+
+async function readMcpSkill(name, env) {
+  if (!MCP_SKILL_NAMES.includes(name)) throw Object.assign(new Error("未登録のSkillです。"), { code: "MCP_SKILL_NOT_FOUND", status: 404 });
+  const path = `${MCP_SKILL_ROOT}/${name}/SKILL.md`;
+  const file = await getSiteSourceFile({ path, offset: 0, limit: SITE_SOURCE_CHUNK_MAX }, maintenanceEnv(env));
+  if (!file.success || file.hasMore) throw Object.assign(new Error(`Skillを完全取得できません: ${name}`), { code: "MCP_SKILL_READ_FAILED", status: 502 });
+  const content = String(file.content || "");
+  const frontmatter = mcpSkillFrontmatter(content);
+  if (frontmatter.name !== name) throw Object.assign(new Error(`Skill directoryとfront matter nameが一致しません: ${name}`), { code: "MCP_SKILL_NAME_MISMATCH", status: 500 });
+  const uri = mcpSkillUri(name);
+  return {
+    entry: { uri, frontmatter, resources: [{ uri, digest: `sha256:${await sha256Hex(content)}` }] },
+    content
+  };
+}
+
+async function listMcpSkills(env) {
+  const skills = await Promise.all(MCP_SKILL_NAMES.map(name => readMcpSkill(name, env)));
+  return skills.map(item => item.entry);
+}
+
+function mcpSkillNameFromUri(uri) {
+  const match = String(uri || "").match(/^skill:\/\/athletics-performance-os\/([a-z0-9-]+)\/SKILL\\.md$/);
+  return match?.[1] || "";
+}
+
+async function mcpProfile(auth, env) {
+  const stableIdentity = String(auth.subject || auth.email || auth.actor || "").trim();
+  if (!stableIdentity) throw Object.assign(new Error("認証済みprofile identityを確定できません。"), { code: "MCP_PROFILE_IDENTITY_MISSING", status: 500 });
+  const digest = await hmacSha256Hex(`mcp-profile:${stableIdentity}`, requiredEnv(env, "APOS_GATEWAY_HMAC_SECRET"));
+  const profile = { id: `apos_prf_${digest.slice(0, 32)}`, nickname: "Athletics Performance OS" };
+  if (auth.email) profile.email = auth.email;
+  return profile;
+}
+
 function mcpTools() {
   const entityEnum = ["overview","settings","sportProfiles","governanceRules","trainingRules","exercises","cycles","events","sessions","menuItems","executions","reviews","measurements","media","proposals","changes","batches","idLedger","recurrenceRules","migrationAudit","dictionary","options"];
   const objectSchema = { type: "object", additionalProperties: true };
   return [
+    mcpProfileTool(),
     mcpTool("apos_status", "APOS status", "Use this to inspect APOS health, inventory, or schema without changing state.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["health","inventory","schema"] } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_training_context", "Training context", "Use this for today's or a specified day's active rules, cycle, sessions, recent executions, reviews, measurements, and events.", { type: "object", additionalProperties: false, properties: { date: { type: "string", format: "date" }, historyDays: { type: "integer", minimum: 1, maximum: 28, default: 14 } } }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_exercise", "Exercise master", "Use this to search registered exercises or retrieve one exact exercise record. Search before proposing a new exercise.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["search","get"] }, query: { type: "string" }, exerciseId: { type: "string" }, includeArchived: { type: "boolean", default: false }, limit: { type: "integer", minimum: 1, maximum: 100, default: 20 } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
@@ -364,6 +443,7 @@ function mcpApproval(approvalHash, changeReason, lockedPreview = null) {
 
 async function runMcpTool(name, args, auth, env, requestId) {
   const actor = { id: auth.actor, source: "MCP_OAUTH" };
+  if (name === "apos_profile") return mcpProfile(auth, env);
   if (name === "apos_status") {
     if (args.mode === "health") return callAppsScript("health", {}, actor, env, true, requestId);
     if (args.mode === "inventory") return callAppsScript("inventory", {}, actor, env, true, requestId);
@@ -455,7 +535,7 @@ async function mcpPreviewTypeFromToken(token, env) {
 }
 
 function requiredMcpScopesForTool(name) {
-  if (["apos_status","apos_training_context","apos_exercise","apos_canonical_read","apos_view_read","apos_preview"].includes(name)) return [MCP_SCOPES.read];
+  if (["apos_profile","apos_status","apos_training_context","apos_exercise","apos_canonical_read","apos_view_read","apos_preview"].includes(name)) return [MCP_SCOPES.read];
   if (name === "apos_apply") return [MCP_SCOPES.write];
   if (["apos_system_read","apos_system_preview","apos_system_apply"].includes(name)) return [MCP_SCOPES.admin];
   return [MCP_SCOPES.read];
@@ -471,9 +551,27 @@ async function handleMcp(request, env, requestId, cors) {
   if (payload.method === "initialize") {
     const auth = await authenticateMcp(request, env, [MCP_SCOPES.read]);
     if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, [MCP_SCOPES.read]) } });
-    return mcpRpcResponse(payload.id ?? null, { protocolVersion: String(payload.params?.protocolVersion || MCP_DEFAULT_PROTOCOL_VERSION), capabilities: { tools: { listChanged: false } }, serverInfo: { name: "athletics-performance-os", version: MCP_VERSION }, instructions: "APOS is private. Read current canonical state before decisions. Every write requires Preview before Apply. Never auto-retry writes after timeout. Verify every successful Apply with an independent read-back." }, cors);
+    return mcpRpcResponse(payload.id ?? null, { protocolVersion: String(payload.params?.protocolVersion || MCP_DEFAULT_PROTOCOL_VERSION), capabilities: { tools: { listChanged: false }, extensions: { "io.modelcontextprotocol/skills": {} } }, serverInfo: { name: "athletics-performance-os", version: MCP_VERSION }, instructions: "APOS is private. Read current canonical state before decisions. Every write requires Preview before Apply. Never auto-retry writes after timeout. Verify every successful Apply with an independent read-back." }, cors);
   }
   if (payload.method === "ping") return mcpRpcResponse(payload.id ?? null, {}, cors);
+  if (["skills/list", "skills/get", "resources/read"].includes(payload.method)) {
+    const auth = await authenticateMcp(request, env, [MCP_SCOPES.read]);
+    if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, [MCP_SCOPES.read]) } });
+    try {
+      if (payload.method === "skills/list") {
+        if (payload.params?.cursor) return mcpRpcResponse(payload.id ?? null, { skills: [] }, cors);
+        return mcpRpcResponse(payload.id ?? null, { skills: await listMcpSkills(env) }, cors);
+      }
+      const uri = String(payload.params?.uri || "");
+      const name = mcpSkillNameFromUri(uri);
+      if (!name) return mcpRpcError(payload.id ?? null, -32602, "Invalid skill URI", cors);
+      const skill = await readMcpSkill(name, env);
+      if (payload.method === "skills/get") return mcpRpcResponse(payload.id ?? null, { skill: skill.entry }, cors);
+      return mcpRpcResponse(payload.id ?? null, { contents: [{ uri: skill.entry.uri, mimeType: "text/markdown; charset=utf-8", text: skill.content }] }, cors);
+    } catch (error) {
+      return mcpRpcError(payload.id ?? null, -32603, safeErrorMessage(error), cors, { code: error?.code || "MCP_SKILL_FAILED" });
+    }
+  }
   if (payload.method === "tools/list") {
     const auth = await authenticateMcp(request, env, [MCP_SCOPES.read]);
     if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, [MCP_SCOPES.read]) } });
