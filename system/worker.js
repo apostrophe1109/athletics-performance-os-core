@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.5.1
+ * Version: 1.5.2
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.5.1";
+const VERSION = "1.5.2";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 32000;
@@ -213,9 +213,10 @@ const MCP_SKILL_NAMES = Object.freeze(["apos-goal-to-day", "apos-training-data",
 let mcpJwksCache = { url: "", expiresAt: 0, keys: [] };
 
 function mcpConfig(env) {
-  const issuer = String(env.APOS_MCP_OAUTH_ISSUER || "").trim().replace(/\/+$/, "");
+  const issuer = String(env.APOS_MCP_OAUTH_ISSUER || "").trim();
+  const issuerBase = issuer.replace(/\/+$/, "");
   const resource = String(env.APOS_MCP_RESOURCE || "").trim().replace(/\/+$/, "");
-  const jwksUrl = String(env.APOS_MCP_JWKS_URL || (issuer ? `${issuer}/.well-known/jwks.json` : "")).trim();
+  const jwksUrl = String(env.APOS_MCP_JWKS_URL || (issuerBase ? `${issuerBase}/.well-known/jwks.json` : "")).trim();
   const allowedEmails = csv(env.APOS_MCP_ALLOWED_EMAILS).map(value => value.toLowerCase());
   const allowedSubjects = csv(env.APOS_MCP_ALLOWED_SUBJECTS);
   return { issuer, resource, jwksUrl, allowedEmails, allowedSubjects };
@@ -240,7 +241,7 @@ function mcpProtectedResourceMetadata(request, env, requestId, cors) {
     resource: config.resource,
     authorization_servers: [config.issuer],
     scopes_supported: [MCP_SCOPES.read, MCP_SCOPES.write, MCP_SCOPES.admin]
-  }), { status: 200, headers: securityHeaders(cors) });
+  }), { status: 200, headers: mcpHeaders(cors) });
 }
 
 async function mcpJwks(config) {
@@ -270,7 +271,7 @@ async function verifyMcpJwt(token, env) {
   if (header.alg !== "RS256" || !header.kid) return { ok: false, code: "MCP_TOKEN_ALG_UNSUPPORTED", status: 401 };
   const now = Math.floor(Date.now() / 1000);
   if (!payload.exp || payload.exp <= now || (payload.nbf && payload.nbf > now + 60)) return { ok: false, code: "MCP_TOKEN_EXPIRED", status: 401 };
-  if (String(payload.iss || "").replace(/\/+$/, "") !== config.issuer) return { ok: false, code: "MCP_TOKEN_ISSUER_MISMATCH", status: 401 };
+  if (String(payload.iss || "") !== config.issuer) return { ok: false, code: "MCP_TOKEN_ISSUER_MISMATCH", status: 401 };
   const audiences = Array.isArray(payload.aud) ? payload.aud.map(String) : [String(payload.aud || "")];
   if (!audiences.includes(config.resource)) return { ok: false, code: "MCP_TOKEN_AUDIENCE_MISMATCH", status: 401 };
   const keys = await mcpJwks(config);
@@ -309,8 +310,19 @@ function mcpBearerToken(request) {
   return match?.[1]?.trim() || "";
 }
 
-function mcpAuthChallenge(request, scopes) {
-  return `Bearer resource_metadata="${mcpResourceMetadataUrl(request)}", scope="${scopes.join(" ")}"`;
+function mcpAuthChallenge(request, scopes, error = "invalid_token", description = "Authentication required") {
+  return `Bearer resource_metadata="${mcpResourceMetadataUrl(request)}", scope="${scopes.join(" ")}", error="${error}", error_description="${description}"`;
+}
+
+function mcpAuthToolResult(request, scopes, auth) {
+  const insufficientScope = auth?.code === "MCP_SCOPE_REQUIRED";
+  const error = insufficientScope ? "insufficient_scope" : "invalid_token";
+  const description = insufficientScope ? "Additional APOS permission is required" : "Authentication is required to continue";
+  return {
+    content: [{ type: "text", text: description }],
+    isError: true,
+    _meta: { "mcp/www_authenticate": [mcpAuthChallenge(request, scopes, error, description)] }
+  };
 }
 
 async function authenticateMcp(request, env, requiredScopes) {
@@ -581,7 +593,7 @@ async function handleMcp(request, env, requestId, cors) {
     const name = String(payload.params?.name || "");
     const scopes = requiredMcpScopesForTool(name);
     const auth = await authenticateMcp(request, env, scopes);
-    if (!auth.ok) return new Response(JSON.stringify({ success: false, code: auth.code || "MCP_AUTH_REQUIRED" }), { status: auth.status || 401, headers: { ...mcpHeaders(cors), "www-authenticate": mcpAuthChallenge(request, scopes) } });
+    if (!auth.ok) return mcpRpcResponse(payload.id ?? null, mcpAuthToolResult(request, scopes, auth), cors);
     try {
       const result = await runMcpTool(name, isPlainObject(payload.params?.arguments) ? payload.params.arguments : {}, auth, env, requestId);
       return mcpRpcResponse(payload.id ?? null, mcpToolResult(result), cors);
