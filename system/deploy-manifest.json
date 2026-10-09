@@ -1,19 +1,24 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_c891db4a0a294fc68f0f99d60b613f6b",
-  "generatedAt": "2026-10-07T03:37:57.946Z",
-  "baseCommitSha": "eeea61dfbeb0ee521a0c41c0e544dabad3623d37",
-  "changeReason": "APOS 1.5.2 OAuth互換修正を承認。issuer完全一致、protected-resource metadataのJSON応答、tool-level再認証challengeを追加し、site/配下は変更しない。",
+  "deploymentId": "SITEDEPLOY_c804e88440ae4c919c8603100e084173",
+  "generatedAt": "2026-10-09T04:54:49.047Z",
+  "baseCommitSha": "79f37325f2f2dff83cbdd3b31d1e6e261dbeef10",
+  "changeReason": "APOS 1.5.3 Parity修正の承認を継続。現行30 Actionsの機能を欠落なくMCPへ引き継ぎ、includeRowNumber、outputSchema、security metadata、MCP応答最小化を追加し、site/配下は変更しない。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "3d6b823b9abb703d07e5b8a5accb4d03c182bd030f38d40805a60b8fc8c729ef"
+      "contentHash": "42593a0e046eea832300509b6f66cc3d615bca46db247a9ece4654a41ed32334"
     },
     {
       "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "1238b946979f82043285c897e5979f0e79ebd90e621350283fe23b962371a5b9"
+      "contentHash": "fbbd143e80098be798807e08992568ce0129253653cd7f1b029f3cd8bdfcb74a"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/plugin.json",
+      "operation": "UPSERT",
+      "contentHash": "1dc14724571dad6b74684ad35d2cac592be1d8a16ea8de809292f7ac02b82327"
     }
   ]
 }

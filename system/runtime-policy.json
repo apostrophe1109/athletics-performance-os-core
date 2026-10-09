@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "system": "Athletics Performance OS",
-  "policyVersion": "2026-10-07",
+  "policyVersion": "2026-10-08",
   "canonicalEntities": [
     "overview",
     "settings",
@@ -63,12 +63,14 @@
     "Preview expiry remains an internal safety control and is normally not presented to the user.",
     "APOS Plugin migration runs in parallel with the existing Custom GPT. Do not migrate the production GPT until MCP OAuth, tool scans, golden prompts, write safety, View deployment verification, rollback, backup, and maintenance acceptance tests all pass.",
     "Plugin Skills, ChatGPT-native UI, Voice workflows, Work monitoring, and Health integration must remain isolated from the GitHub Pages site bundle by default. They must not add JavaScript, CSS, assets, or extra network calls to site/ unless a separate site-performance Preview explicitly demonstrates the need and acceptable impact.",
-    "MCP OAuth must advertise the authorization-server issuer exactly as published by its discovery metadata, including any trailing slash, and tool-level authentication failures must expose a standards-compliant mcp/www_authenticate challenge for safe reauthorization."
+    "MCP OAuth must advertise the authorization-server issuer exactly as published by its discovery metadata, including any trailing slash, and tool-level authentication failures must expose a standards-compliant mcp/www_authenticate challenge for safe reauthorization.",
+    "MCP migration parity must preserve the functional capability of all 30 legacy Actions even when several legacy operations are intentionally grouped behind one goal-oriented MCP tool. Parameters required by legacy read workflows, including includeRowNumber, must remain available.",
+    "Plugin tool responses must minimize transport and infrastructure metadata. Request IDs and canonical Spreadsheet identifiers are not exposed through MCP unless a future workflow proves them strictly necessary."
   ],
   "runtimeVersions": {
-    "worker": "1.5.2",
-    "plugin": "0.2.0",
-    "mcpContract": "1.1.1",
+    "worker": "1.5.3",
+    "plugin": "0.2.1",
+    "mcpContract": "1.1.2",
     "appsScriptApi": "1.2.5",
     "canonicalSchema": "1.1.0",
     "openapi": "2.5.2",

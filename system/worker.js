@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.5.2
+ * Version: 1.5.3
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.5.2";
+const VERSION = "1.5.3";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 32000;
@@ -349,7 +349,17 @@ function mcpToolResult(value, isError = false) {
   return result;
 }
 function mcpTool(name, title, description, inputSchema, scopes, annotations) {
-  return { name, title, description, inputSchema, securitySchemes: [{ type: "oauth2", scopes }], annotations: { readOnlyHint: Boolean(annotations?.readOnlyHint), destructiveHint: Boolean(annotations?.destructiveHint), openWorldHint: false } };
+  const securitySchemes = [{ type: "oauth2", scopes }];
+  return {
+    name,
+    title,
+    description,
+    inputSchema,
+    outputSchema: { type: "object", additionalProperties: true },
+    securitySchemes,
+    annotations: { readOnlyHint: Boolean(annotations?.readOnlyHint), destructiveHint: Boolean(annotations?.destructiveHint), openWorldHint: false },
+    _meta: { securitySchemes }
+  };
 }
 
 function mcpProfileTool() {
@@ -371,7 +381,7 @@ function mcpProfileTool() {
     },
     securitySchemes: [{ type: "oauth2", scopes: [MCP_SCOPES.read] }],
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    _meta: { "openai/profile": true }
+    _meta: { "openai/profile": true, securitySchemes: [{ type: "oauth2", scopes: [MCP_SCOPES.read] }] }
   };
 }
 
@@ -436,7 +446,7 @@ function mcpTools() {
     mcpTool("apos_status", "APOS status", "Use this to inspect APOS health, inventory, or schema without changing state.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["health","inventory","schema"] } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_training_context", "Training context", "Use this for today's or a specified day's active rules, cycle, sessions, recent executions, reviews, measurements, and events.", { type: "object", additionalProperties: false, properties: { date: { type: "string", format: "date" }, historyDays: { type: "integer", minimum: 1, maximum: 28, default: 14 } } }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_exercise", "Exercise master", "Use this to search registered exercises or retrieve one exact exercise record. Search before proposing a new exercise.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["search","get"] }, query: { type: "string" }, exerciseId: { type: "string" }, includeArchived: { type: "boolean", default: false }, limit: { type: "integer", minimum: 1, maximum: 100, default: 20 } }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
-    mcpTool("apos_canonical_read", "Canonical data read", "Use this to retrieve one canonical record by key or query canonical records by filters. It never writes.", { type: "object", additionalProperties: false, properties: { entity: { type: "string", enum: entityEnum }, key: { type: "string" }, filters: objectSchema, sortBy: { type: "string" }, sortDirection: { type: "string", enum: ["ASC","DESC"], default: "ASC" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 500, default: 100 } }, required: ["entity"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
+    mcpTool("apos_canonical_read", "Canonical data read", "Use this to retrieve one canonical record by key or query canonical records by filters. It never writes.", { type: "object", additionalProperties: false, properties: { entity: { type: "string", enum: entityEnum }, key: { type: "string" }, filters: objectSchema, sortBy: { type: "string" }, sortDirection: { type: "string", enum: ["ASC","DESC"], default: "ASC" }, offset: { type: "integer", minimum: 0, default: 0 }, limit: { type: "integer", minimum: 1, maximum: 500, default: 100 }, includeRowNumber: { type: "boolean", default: false } }, required: ["entity"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_view_read", "APOS View read", "Use this to inspect the current View layout, source tree/file, or deployment status without changing GitHub.", { type: "object", additionalProperties: false, properties: { mode: { type: "string", enum: ["layout","tree","file","deployment"] }, payload: objectSchema }, required: ["mode"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_preview", "Preview APOS change", "Use this to create a canonical or View preview. Preview is read-only and must precede every apply.", { type: "object", additionalProperties: false, properties: { domain: { type: "string", enum: ["canonical","view"] }, kind: { type: "string", enum: ["mutation","batch","rollback","backup","layout","source"] }, payload: objectSchema }, required: ["domain","kind","payload"] }, [MCP_SCOPES.read], { readOnlyHint: true }),
     mcpTool("apos_apply", "Apply approved APOS change", "Use this only after a matching preview and explicit user approval. It applies canonical or View changes and is never safe to auto-retry after timeout.", { type: "object", additionalProperties: false, properties: { domain: { type: "string", enum: ["canonical","view"] }, lockedPreview: objectSchema, lockedPreviewToken: { type: "string" }, approvalHash: { type: "string", pattern: "^[A-Fa-f0-9]{64}$" }, changeReason: { type: "string", minLength: 3, maxLength: 500 } }, required: ["domain","approvalHash","changeReason"] }, [MCP_SCOPES.write], { destructiveHint: true }),
@@ -476,7 +486,7 @@ async function runMcpTool(name, args, auth, env, requestId) {
   }
   if (name === "apos_canonical_read") {
     if (String(args.key || "").trim()) return callAppsScript("getRecord", { entity: args.entity, key: String(args.key) }, actor, env, true, requestId);
-    return callAppsScript("getRecords", { entity: args.entity, ...(isPlainObject(args.filters) ? { filters: args.filters } : {}), ...(args.sortBy ? { sortBy: args.sortBy } : {}), ...(args.sortDirection ? { sortDirection: args.sortDirection } : {}), ...(Number.isInteger(args.offset) ? { offset: args.offset } : {}), ...(Number.isInteger(args.limit) ? { limit: args.limit } : {}) }, actor, env, true, requestId);
+    return callAppsScript("getRecords", { entity: args.entity, ...(isPlainObject(args.filters) ? { filters: args.filters } : {}), ...(args.sortBy ? { sortBy: args.sortBy } : {}), ...(args.sortDirection ? { sortDirection: args.sortDirection } : {}), ...(Number.isInteger(args.offset) ? { offset: args.offset } : {}), ...(Number.isInteger(args.limit) ? { limit: args.limit } : {}), ...(typeof args.includeRowNumber === "boolean" ? { includeRowNumber: args.includeRowNumber } : {}) }, actor, env, true, requestId);
   }
   if (name === "apos_view_read") {
     const payload = isPlainObject(args.payload) ? args.payload : {};
@@ -546,6 +556,26 @@ async function mcpPreviewTypeFromToken(token, env) {
   return "";
 }
 
+function minimizeMcpResult(name, value) {
+  if (!isPlainObject(value) && !Array.isArray(value)) return value;
+  const clean = JSON.parse(JSON.stringify(value));
+  const visit = node => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (!isPlainObject(node)) return;
+    delete node.requestId;
+    if (name === "apos_status") {
+      delete node.spreadsheetId;
+      delete node.targetSpreadsheetId;
+    }
+    for (const child of Object.values(node)) visit(child);
+  };
+  visit(clean);
+  return clean;
+}
+
 function requiredMcpScopesForTool(name) {
   if (["apos_profile","apos_status","apos_training_context","apos_exercise","apos_canonical_read","apos_view_read","apos_preview"].includes(name)) return [MCP_SCOPES.read];
   if (name === "apos_apply") return [MCP_SCOPES.write];
@@ -596,7 +626,7 @@ async function handleMcp(request, env, requestId, cors) {
     if (!auth.ok) return mcpRpcResponse(payload.id ?? null, mcpAuthToolResult(request, scopes, auth), cors);
     try {
       const result = await runMcpTool(name, isPlainObject(payload.params?.arguments) ? payload.params.arguments : {}, auth, env, requestId);
-      return mcpRpcResponse(payload.id ?? null, mcpToolResult(result), cors);
+      return mcpRpcResponse(payload.id ?? null, mcpToolResult(minimizeMcpResult(name, result)), cors);
     } catch (error) {
       return mcpRpcResponse(payload.id ?? null, mcpToolResult({ success: false, code: error?.code || "MCP_TOOL_FAILED", error: safeErrorMessage(error) }, true), cors);
     }
