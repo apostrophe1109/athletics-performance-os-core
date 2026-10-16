@@ -1,13 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_460a710ff7eb4397949f46efa616d585",
-  "generatedAt": "2026-10-01T08:04:03.509Z",
-  "baseCommitSha": "7562d9997694faaae0d6c64c9324d0082599fd8e",
-  "changeReason": "ロールバック承認継続：公開サイト閲覧不能の復旧を優先し、直前のEasyトリプルView変更のみを戻す。Sheets正本データとTDR031は維持する。",
+  "deploymentId": "SITEDEPLOY_68eb4e46591a4380a40026a5f2c6d820",
+  "generatedAt": "2026-10-16T00:57:56.707Z",
+  "baseCommitSha": "085919f93cea2fd0684e3fb4a67388e11cd55c0f",
+  "changeReason": "承認済み2026年10月25日次戦表示と日本時間日付処理の緊急修正",
   "files": [
     {
-      "operation": "ROLLBACK",
-      "rollbackToCommitSha": "57c465cd7381650bf50d599e1a2b793f54499892"
+      "path": "site/app.js",
+      "operation": "UPSERT",
+      "contentHash": "5fbd1f0421c3952bb8c4d54e6367da9e8b8d4b5df995838a22ace75ec78268f8"
     }
   ]
 }

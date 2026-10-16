@@ -20,6 +20,7 @@ const state = {
   measurements: [],
   exercises: [],
   events: [],
+  competitionSessions: [],
   profile: null,
   fetchedAt: null,
   dayCache: new Map(),
@@ -142,12 +143,14 @@ async function hydrateDayMenuItems(date, sessions) {
 }
 
 async function loadCompetitionData() {
-  const [profiles, events] = await Promise.all([
+  const [profiles, events, sessions] = await Promise.all([
     records("sportProfiles", { sportProfileId: config.sportProfileId }, "sportProfileId", "ASC", 1),
-    records("events", { sportProfileId: config.sportProfileId, startDate: { $gte: state.today }, status: { $ne: "ARCHIVED" } }, "startDate", "ASC", 10)
+    records("events", { sportProfileId: config.sportProfileId, startDate: { $gte: state.today }, status: { $ne: "ARCHIVED" } }, "startDate", "ASC", 10),
+    records("sessions", { sportProfileId: config.sportProfileId, sessionDate: { $gte: state.today, $lte: addDays(state.today, 120) } }, "sessionDate", "ASC", 100)
   ]);
   state.profile = profiles.records?.[0] || null;
   state.events = events.records || [];
+  state.competitionSessions = (sessions.records || []).filter(s => s.planStatus !== "ARCHIVED" && (/COMPETITION/i.test(String(s.role || "")) || s.mainAdaptation === "COMPETITION_EXPRESSION"));
   state.competitionLoaded = true;
   renderDashboard();
 }
@@ -264,7 +267,7 @@ function renderCompetitionStrip() {
   } else if (event) {
     const days = daysBetween(state.today, dateOnly(event.startDate));
     target.append(
-      element("span", "competition-strip__date", `次戦 ${formatShortDate(event.startDate)} ${event.startTime || ""}`.trim()),
+      element("span", "competition-strip__date", `次戦 ${formatShortDate(event.startDate)} ${event.startTime || ""}${event.eventName ? `｜${event.eventName}` : ""}`.trim()),
       element("span", "competition-strip__count", days >= 0 ? `あと ${days}日` : "終了")
     );
   } else {
@@ -2282,9 +2285,9 @@ function daySessions(date) {
 }
 
 function nextCompetition() {
-  return state.events
-    .filter(event => event.eventType === "COMPETITION" && dateOnly(event.startDate) >= state.today && event.status !== "ARCHIVED")
-    .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)))[0] || null;
+  const fromEvents = state.events.filter(e => e.eventType === "COMPETITION" && dateOnly(e.startDate) >= state.today && !["ARCHIVED", "CANCELLED", "COMPLETED"].includes(String(e.status || "").toUpperCase()));
+  const fromSessions = state.competitionSessions.filter(s => dateOnly(s.sessionDate) >= state.today).map(s => ({ startDate: dateOnly(s.sessionDate), startTime: s.startTime || "", eventName: s.title || "三段跳競技" }));
+  return [...fromEvents, ...fromSessions].sort((a, b) => dateOnly(a.startDate).localeCompare(dateOnly(b.startDate)))[0] || null;
 }
 
 function sectionHeader(title, note) {
@@ -2760,8 +2763,15 @@ function todayInTimezone() {
 }
 
 function dateOnly(value) {
-  const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : "";
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?=$|[T\s])/);
+  if (!match) return "";
+  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(raw.slice(10))) return match[1];
+  const instant = new Date(raw);
+  if (!Number.isFinite(instant.getTime())) return match[1];
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: config.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(instant);
+  const fields = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${fields.year}-${fields.month}-${fields.day}`;
 }
 
 function startOfWeek(date) {
