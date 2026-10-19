@@ -390,11 +390,11 @@ function mcpSkillUri(name) {
 }
 
 function mcpSkillFrontmatter(content) {
-  const match = String(content || "").match(/^---\\s*\\n([\\s\\S]*?)\\n---(?:\\s*\\n|$)/);
+  const match = String(content || "").match(/^---\s*\n([\s\S]*?)\n---(?:\s*\n|$)/);
   if (!match) throw Object.assign(new Error("SKILL.md front matterを解析できません。"), { code: "MCP_SKILL_FRONTMATTER_INVALID", status: 500 });
   const frontmatter = {};
-  for (const line of match[1].split(/\\r?\\n/)) {
-    const field = line.match(/^([A-Za-z0-9_-]+):\\s*(.*)$/);
+  for (const line of match[1].split(/\r?\n/)) {
+    const field = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (!field) continue;
     let value = field[2].trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
@@ -425,7 +425,7 @@ async function listMcpSkills(env) {
 }
 
 function mcpSkillNameFromUri(uri) {
-  const match = String(uri || "").match(/^skill:\/\/athletics-performance-os\/([a-z0-9-]+)\/SKILL\\.md$/);
+  const match = String(uri || "").match(/^skill:\/\/athletics-performance-os\/([a-z0-9-]+)\/SKILL\.md$/);
   return match?.[1] || "";
 }
 

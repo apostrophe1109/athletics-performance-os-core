@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_c804e88440ae4c919c8603100e084173",
-  "generatedAt": "2026-10-09T04:54:49.047Z",
-  "baseCommitSha": "79f37325f2f2dff83cbdd3b31d1e6e261dbeef10",
-  "changeReason": "APOS 1.5.3 Parity修正の承認を継続。現行30 Actionsの機能を欠落なくMCPへ引き継ぎ、includeRowNumber、outputSchema、security metadata、MCP応答最小化を追加し、site/配下は変更しない。",
+  "deploymentId": "SITEDEPLOY_d60454af0ebc49cbb1639697a9e579f0",
+  "generatedAt": "2026-10-19T12:22:35.107Z",
+  "baseCommitSha": "139de146b71a00a2db243dd966511c240bdafd8a",
+  "changeReason": "山下祐樹の明示承認に基づき、APOS Skills解析の正規表現4行のみを修正する。site/・正本・Secretは変更せず、Worker Deploy後にHealthとRead-backを検証する。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "42593a0e046eea832300509b6f66cc3d615bca46db247a9ece4654a41ed32334"
-    },
-    {
-      "path": "system/runtime-policy.json",
-      "operation": "UPSERT",
-      "contentHash": "fbbd143e80098be798807e08992568ce0129253653cd7f1b029f3cd8bdfcb74a"
-    },
-    {
-      "path": "system/plugin/athletics-performance-os/plugin.json",
-      "operation": "UPSERT",
-      "contentHash": "1dc14724571dad6b74684ad35d2cac592be1d8a16ea8de809292f7ac02b82327"
+      "contentHash": "bba8d9625d19b4a1c5071519e1ee7134fcb555c4a05143e74a7d3014c93b7d11"
     }
   ]
 }
