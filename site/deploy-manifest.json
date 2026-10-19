@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_68eb4e46591a4380a40026a5f2c6d820",
-  "generatedAt": "2026-10-16T00:57:56.707Z",
-  "baseCommitSha": "085919f93cea2fd0684e3fb4a67388e11cd55c0f",
-  "changeReason": "承認済み2026年10月25日次戦表示と日本時間日付処理の緊急修正",
+  "deploymentId": "SITEDEPLOY_4e2f712a5fed4573abe1f161eba7f0d9",
+  "generatedAt": "2026-10-19T13:03:35.456Z",
+  "baseCommitSha": "5426eeefe1c2b4856d526e9141bcd459774b037f",
+  "changeReason": "山下祐樹がsite/凍結の例外として明示承認したViewデプロイ検証。site/README.mdの非表示コメント1行と自動配備記録だけを変更し、HTML/JS/CSS/画像/通信を追加・変更しない。配備検証後に正式Rollback Previewを提示し、復元承認を確認する。",
   "files": [
     {
-      "path": "site/app.js",
+      "path": "site/README.md",
       "operation": "UPSERT",
-      "contentHash": "5fbd1f0421c3952bb8c4d54e6367da9e8b8d4b5df995838a22ace75ec78268f8"
+      "contentHash": "05c55f4c87bdda1e755298f6718b36cec05c7c3c125fb2126cf0bf80b784383b"
     }
   ]
 }
