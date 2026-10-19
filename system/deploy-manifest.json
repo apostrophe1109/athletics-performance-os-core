@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_75eec8d8ae6740f69900040dd555fa71",
-  "generatedAt": "2026-10-19T13:29:37.955Z",
-  "baseCommitSha": "b610d19522a823d396054cd688cc8dc2700a439f",
-  "changeReason": "山下祐樹の明示承認に基づき、Rollback承認メタデータ復元と通常Preview整合の承認済み2箇所修正を適用する。",
+  "deploymentId": "SITEDEPLOY_bbf62ae4e1914b5ebb3c02e773c2a873",
+  "generatedAt": "2026-10-19T13:39:16.405Z",
+  "baseCommitSha": "857bc7b23678a8fe208e97d85a02e1198e6f9847",
+  "changeReason": "山下祐樹の追加明示承認に基づき、本番と同じ厳格な物理削除判定へリポジトリを同期する。",
   "files": [
     {
       "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "3bb787cd0a11171ece48a47ef027fbdc3dd064b5940491577618e4003dbd9bdf"
+      "contentHash": "731db690e0520fc8f76fe3a6d0aa21aa54765818338dc2514df0c86fa618b2da"
     }
   ]
 }

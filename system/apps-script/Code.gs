@@ -1416,12 +1416,9 @@ function APOS_verifySheetHashes_(items) {
 function APOS_assertDeleteAllowed_(items, approval) {
   var hasDelete = items.some(function(item) { return item.actualOperation === 'DELETE'; });
   if (!hasDelete) return;
-  if (approval.destructiveApproval !== 'DELETE_APPROVED') APOS_throw_('DESTRUCTIVE_APPROVAL_REQUIRED', '物理削除にはdestructiveApproval=DELETE_APPROVEDが必要です。');
   var enabled = String(PropertiesService.getScriptProperties().getProperty(APOS_CONFIG.DELETE_PROPERTY) || '').toLowerCase() === 'true';
-  var approvedExerciseIdMigrationDelete = items.every(function(item) {
-    return item.entity === 'exercises' && item.actualOperation === 'DELETE' && /^EX_202608/.test(String(item.key || ''));
-  }) && String(approval.changeReason || '').indexOf('種目ID連番化') !== -1;
-  if (!enabled && !approvedExerciseIdMigrationDelete) APOS_throw_('PHYSICAL_DELETE_DISABLED', '物理削除は無効です。ARCHIVEを使用してください。');
+  if (!enabled) APOS_throw_('PHYSICAL_DELETE_DISABLED', '物理削除は無効です。ARCHIVEを使用してください。');
+  if (approval.destructiveApproval !== 'DELETE_APPROVED') APOS_throw_('DESTRUCTIVE_APPROVAL_REQUIRED', '物理削除にはdestructiveApproval=DELETE_APPROVEDが必要です。');
 }
 
 function APOS_assertIdAvailableForInsert_(entity, key, options) {
