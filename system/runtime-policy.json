@@ -68,7 +68,7 @@
     "Plugin tool responses must minimize transport and infrastructure metadata. Request IDs and canonical Spreadsheet identifiers are not exposed through MCP unless a future workflow proves them strictly necessary."
   ],
   "runtimeVersions": {
-    "worker": "1.5.3",
+    "worker": "1.5.4",
     "plugin": "0.2.1",
     "mcpContract": "1.1.2",
     "appsScriptApi": "1.2.5",

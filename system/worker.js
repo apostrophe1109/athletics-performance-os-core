@@ -1,6 +1,6 @@
 /**
  * Athletics Performance OS - Cloudflare Worker Gateway
- * Version: 1.5.3
+ * Version: 1.5.4
  *
  * Required Worker secrets:
  *   APOS_APPS_SCRIPT_URL
@@ -26,7 +26,7 @@
  * Never place secret values directly in this source file.
  */
 
-const VERSION = "1.5.3";
+const VERSION = "1.5.4";
 const GATEWAY_PROTOCOL = "APOS-HMAC-SHA256-V1";
 const MAX_BODY_CHARS = 700000;
 const BACKEND_READ_TIMEOUT_MS = 32000;
@@ -2007,9 +2007,21 @@ async function getMaintenanceBackendDiagnostic(env) {
     body: JSON.stringify(envelope),
   });
 
+  const backendReady = signedHealthProbe.bodySummary?.success === true && signedHealthProbe.bodySummary?.status === "READY";
+  const deploymentIdVerified = Boolean(repoVariableReadable && repoDeploymentId && urlDeploymentId === repoDeploymentId);
+  const deploymentIdMismatch = Boolean(repoVariableReadable && repoDeploymentId && urlDeploymentId !== repoDeploymentId);
+  const diagnosticWarnings = [];
+  if (!repoVariableReadable) diagnosticWarnings.push("REPOSITORY_VARIABLE_UNREADABLE");
+  else if (!repoDeploymentId) diagnosticWarnings.push("REPOSITORY_DEPLOYMENT_ID_EMPTY");
+  else if (urlDeploymentId !== repoDeploymentId) diagnosticWarnings.push("BACKEND_DEPLOYMENT_ID_MISMATCH");
+  if (!backendReady) diagnosticWarnings.push("SIGNED_BACKEND_HEALTH_NOT_READY");
+
   return {
     success: true,
-    status: "READY",
+    status: backendReady && deploymentIdVerified ? "READY" : (!backendReady || deploymentIdMismatch ? "FAILED" : "PARTIAL"),
+    backendReady,
+    deploymentIdVerified,
+    diagnosticWarnings,
     urlDeploymentIdSuffix: urlDeploymentId ? urlDeploymentId.slice(-8) : null,
     repoDeploymentIdSuffix: repoDeploymentId ? repoDeploymentId.slice(-8) : null,
     deploymentIdMatches: repoVariableReadable && repoDeploymentId ? urlDeploymentId === repoDeploymentId : null,

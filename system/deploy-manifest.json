@@ -1,14 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_bbf62ae4e1914b5ebb3c02e773c2a873",
-  "generatedAt": "2026-10-19T13:39:16.405Z",
-  "baseCommitSha": "857bc7b23678a8fe208e97d85a02e1198e6f9847",
-  "changeReason": "山下祐樹の追加明示承認に基づき、本番と同じ厳格な物理削除判定へリポジトリを同期する。",
+  "deploymentId": "SITEDEPLOY_70aad2adc7e743f48d197082f09c3f9b",
+  "generatedAt": "2026-10-19T20:11:32.367Z",
+  "baseCommitSha": "d00f75789856416655e1b89a7737998dbed4c56e",
+  "changeReason": "山下祐樹が2026-10-20の正式Preview提示後に『診断修正を承認』と明示承認した2ファイルのみを反映。診断誤READYの是正とWorker1.5.4の同期。競技データ・site/・権限・認証・Secret・安全機構は変更しない。",
   "files": [
     {
-      "path": "system/apps-script/Code.gs",
+      "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "731db690e0520fc8f76fe3a6d0aa21aa54765818338dc2514df0c86fa618b2da"
+      "contentHash": "f2ec72b10090da85e36fedc42478bbf74366e56af18991b36c2c087725e9f06e"
+    },
+    {
+      "path": "system/runtime-policy.json",
+      "operation": "UPSERT",
+      "contentHash": "bea00fe726dc741d030d98ec5786a96b2fd4cb4331369263f629a17ff6b6b44f"
     }
   ]
 }
