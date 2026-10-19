@@ -43,5 +43,3 @@ python3 -m http.server 8080 --directory site
 ## 公開
 
 同梱の `.github/workflows/deploy-site.yml` は、`main` ブランチ上の `site/` をGitHub Pagesへ公開します。`ui-layout.json` の承認済み変更がコミットされると、自動的に新しい表示へ更新されます。
-
-<!-- APOS Plugin移行のDeployment検証：2026-10-19。UI資産・追加通信なし。 -->
