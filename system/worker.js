@@ -467,7 +467,10 @@ async function runMcpTool(name, args, auth, env, requestId) {
   const actor = { id: auth.actor, source: "MCP_OAUTH" };
   if (name === "apos_profile") return mcpProfile(auth, env);
   if (name === "apos_status") {
-    if (args.mode === "health") return callAppsScript("health", {}, actor, env, true, requestId);
+    if (args.mode === "health") {
+      const gatewayHealth = await (await handleHealth(env, requestId, {})).json();
+      return { ...(isPlainObject(gatewayHealth.backend) ? gatewayHealth.backend : {}), ...gatewayHealth };
+    }
     if (args.mode === "inventory") return callAppsScript("inventory", {}, actor, env, true, requestId);
     if (args.mode === "schema") return callAppsScript("validateSchema", {}, actor, env, true, requestId);
     throw Object.assign(new Error("modeが不正です。"), { code: "MCP_ARGUMENT_INVALID", status: 400 });

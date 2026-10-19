@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_d60454af0ebc49cbb1639697a9e579f0",
-  "generatedAt": "2026-10-19T12:22:35.107Z",
-  "baseCommitSha": "139de146b71a00a2db243dd966511c240bdafd8a",
-  "changeReason": "山下祐樹の明示承認に基づき、APOS Skills解析の正規表現4行のみを修正する。site/・正本・Secretは変更せず、Worker Deploy後にHealthとRead-backを検証する。",
+  "deploymentId": "SITEDEPLOY_244b90b4561146b187eb82ae7b545814",
+  "generatedAt": "2026-10-19T12:53:17.780Z",
+  "baseCommitSha": "e331a01424f8c9f932d2d3b908ee3c194bc991fe",
+  "changeReason": "山下祐樹のPreview後の明示承認に基づき、Plugin healthのWorker診断情報欠落を修正する。既存backend項目を保ち、Worker版・配備commit・OAuth準備状態を統合。site/・正本・Secret・権限は変更しない。",
   "files": [
     {
       "path": "system/worker.js",
       "operation": "UPSERT",
-      "contentHash": "bba8d9625d19b4a1c5071519e1ee7134fcb555c4a05143e74a7d3014c93b7d11"
+      "contentHash": "fd60a88194af0be369e904cef19dae294ee1f5caa71cd6f3b0c5f1aa5bc7d648"
     }
   ]
 }
