@@ -1,14 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_244b90b4561146b187eb82ae7b545814",
-  "generatedAt": "2026-10-19T12:53:17.780Z",
-  "baseCommitSha": "e331a01424f8c9f932d2d3b908ee3c194bc991fe",
-  "changeReason": "山下祐樹のPreview後の明示承認に基づき、Plugin healthのWorker診断情報欠落を修正する。既存backend項目を保ち、Worker版・配備commit・OAuth準備状態を統合。site/・正本・Secret・権限は変更しない。",
+  "deploymentId": "SITEDEPLOY_75eec8d8ae6740f69900040dd555fa71",
+  "generatedAt": "2026-10-19T13:29:37.955Z",
+  "baseCommitSha": "b610d19522a823d396054cd688cc8dc2700a439f",
+  "changeReason": "山下祐樹の明示承認に基づき、Rollback承認メタデータ復元と通常Preview整合の承認済み2箇所修正を適用する。",
   "files": [
     {
-      "path": "system/worker.js",
+      "path": "system/apps-script/Code.gs",
       "operation": "UPSERT",
-      "contentHash": "fd60a88194af0be369e904cef19dae294ee1f5caa71cd6f3b0c5f1aa5bc7d648"
+      "contentHash": "3bb787cd0a11171ece48a47ef027fbdc3dd064b5940491577618e4003dbd9bdf"
     }
   ]
 }

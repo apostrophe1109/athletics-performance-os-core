@@ -1077,6 +1077,11 @@ function APOS_prepareLockedMutation_(mutation, actor, options) {
     after = APOS_normalizeRecordForStorage_(entity, after, APOS_headers_(APOS_sheet_(config.sheet)));
   }
   var proposal = APOS_CONTROLLED_ENTITIES[entity] ? APOS_prepareProposal_(mutation.proposal, entity, actualOperation, key, before, after, actor) : null;
+  if (after && !options.rollbackOfChangeId) {
+    if (Object.prototype.hasOwnProperty.call(after, 'approvalStatus')) after.approvalStatus = 'APPROVED';
+    if (Object.prototype.hasOwnProperty.call(after, 'proposalId') && proposal) after.proposalId = proposal.proposalId;
+    if (Object.prototype.hasOwnProperty.call(after, 'previewStatus')) after.previewStatus = 'CONFIRMED';
+  }
   if (proposal && after && after.sportProfileId && String(after.sportProfileId) !== String(proposal.sportProfileId)) {
     APOS_throw_('PROPOSAL_SPORT_PROFILE_MISMATCH', '提案のsportProfileIdと変更対象が一致しません。');
   }
@@ -1200,12 +1205,14 @@ function APOS_executeRowMutation_(locked, approval) {
   var currentBeforeRecord = found ? APOS_clone_(found.record) : null;
   var afterRecord = locked.after ? (compactStartTimeUpdate ? APOS_merge_(currentBeforeRecord, locked.after) : APOS_clone_(locked.after)) : null;
   if (afterRecord) {
-    if (headers.indexOf('approvalStatus') !== -1) afterRecord.approvalStatus = 'APPROVED';
-    if (headers.indexOf('approvedBy') !== -1) afterRecord.approvedBy = approval.approvedBy;
-    if (headers.indexOf('approvedAt') !== -1) afterRecord.approvedAt = approval.approvedAt;
-    if (headers.indexOf('proposalId') !== -1 && locked.proposal) afterRecord.proposalId = locked.proposal.proposalId;
-    if (headers.indexOf('previewStatus') !== -1) afterRecord.previewStatus = 'CONFIRMED';
-    if (headers.indexOf('recordedAt') !== -1 && !afterRecord.recordedAt) afterRecord.recordedAt = APOS_nowIso_();
+    if (!locked.rollbackOfChangeId) {
+      if (headers.indexOf('approvalStatus') !== -1) afterRecord.approvalStatus = 'APPROVED';
+      if (headers.indexOf('approvedBy') !== -1) afterRecord.approvedBy = approval.approvedBy;
+      if (headers.indexOf('approvedAt') !== -1) afterRecord.approvedAt = approval.approvedAt;
+      if (headers.indexOf('proposalId') !== -1 && locked.proposal) afterRecord.proposalId = locked.proposal.proposalId;
+      if (headers.indexOf('previewStatus') !== -1) afterRecord.previewStatus = 'CONFIRMED';
+      if (headers.indexOf('recordedAt') !== -1 && !afterRecord.recordedAt) afterRecord.recordedAt = APOS_nowIso_();
+    }
     APOS_validateRecord_(entity, afterRecord, { operation: locked.actualOperation, before: compactStartTimeUpdate ? currentBeforeRecord : locked.before });
     afterRecord = APOS_normalizeRecordForStorage_(entity, afterRecord, headers);
   }
