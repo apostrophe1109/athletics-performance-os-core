@@ -150,7 +150,7 @@ async function loadCompetitionData() {
   ]);
   state.profile = profiles.records?.[0] || null;
   state.events = events.records || [];
-  state.competitionSessions = (sessions.records || []).filter(s => s.planStatus !== "ARCHIVED" && (/COMPETITION/i.test(String(s.role || "")) || s.mainAdaptation === "COMPETITION_EXPRESSION"));
+  state.competitionSessions = (sessions.records || []).filter(isCompetitionSession);
   state.competitionLoaded = true;
   renderDashboard();
 }
@@ -381,7 +381,7 @@ function renderDayMenuSections(context, sessions) {
   );
   panel.append(heading);
 
-  const entries = dayMenuEntries(context, sessions);
+  const entries = dayMenuEntries(context, sessions).filter(item => !isOmittedMenuItem(item.title));
   if (!entries.length) {
     panel.append(empty("この日の詳細メニューは正本に登録されていません。"));
     return panel;
@@ -497,10 +497,15 @@ function canonicalExerciseIntensityScore(exerciseId, text, session, explicitValu
   return resolvedTrainingIntensity(text, session, explicitValue);
 }
 
+function isOmittedMenuItem(value) {
+  return /^(?:WU|PRIMER|MAIN|CD|ウォームアップ|プライマー|メイン|補強|クールダウン)\s*[:：]?\s*(?:なし|無し|省略|中止|実施しない)[。．]?$/i.test(String(value || "").trim());
+}
+
 function isRecoveryOnlyItem(value) {
   const text = String(value || "").trim().replace(/\s+/g, "");
   if (!text) return false;
-  return /^(?:完全)?(?:休息|休養|回復|REST)$/i.test(text)
+  return /^CD[:：]/i.test(text)
+    || /^(?:完全)?(?:休息|休養|回復|REST)$/i.test(text)
     || /^\d+(?:〜|~|-)?\d*分(?:間)?(?:完全)?(?:回復|休息|休養)$/i.test(text)
     || /^\d+(?:〜|~|-)?\d*秒(?:間)?(?:完全)?(?:回復|休息|休養)$/i.test(text);
 }
@@ -1582,7 +1587,7 @@ async function searchExerciseLibrary(query) {
 
 function renderHistory() {
   const panel = element("section", "secondary-panel");
-  panel.append(sectionHeader("最近の実施記録", "保存済み＋REST自動判定"));
+  panel.append(sectionHeader("最近の実施記録", "保存済み記録＋REST予定"));
   const list = element("div", "card-list");
   const items = combinedHistoryItems().slice(0, 8);
   if (!state.secondaryLoaded) list.append(empty("バックグラウンドで読み込み中…"));
@@ -1590,9 +1595,9 @@ function renderHistory() {
   items.forEach(item => {
     if (item.kind === "rest") {
       list.append(recordCard(
-        "REST完遂（自動判定）",
+        "REST予定（実施記録なし）",
         formatJapaneseDate(item.date),
-        `${item.session.title || "完全休養"} / 当日の実施記録が0件のため完遂扱い`
+        `${item.session.title || "完全休養"} / 当日の実施記録は0件。予定と実施済みは区別します。`
       ));
       return;
     }
@@ -2021,9 +2026,17 @@ function daySessions(date) {
   return state.sessions.filter(session => dateOnly(session.sessionDate) === date && session.planStatus !== "ARCHIVED");
 }
 
+function isCompetitionSession(session) {
+  if (!session || ["ARCHIVED", "CANCELLED"].includes(String(session.planStatus || "").toUpperCase())) return false;
+  const role = String(session.role || "").toUpperCase();
+  if (/PRE[\s_-]*COMPETITION|SIMULATION|TAPER/.test(role)) return false;
+  return session.mainAdaptation === "COMPETITION_EXPRESSION"
+    || /(?:^|[\s/|])COMPETITION(?:$|[\s/|])/.test(role);
+}
+
 function nextCompetition() {
   const fromEvents = state.events.filter(e => e.eventType === "COMPETITION" && dateOnly(e.startDate) >= state.today && !["ARCHIVED", "CANCELLED", "COMPLETED"].includes(String(e.status || "").toUpperCase()));
-  const fromSessions = state.competitionSessions.filter(s => dateOnly(s.sessionDate) >= state.today).map(s => ({ startDate: dateOnly(s.sessionDate), startTime: s.startTime || "", eventName: s.title || "三段跳競技" }));
+  const fromSessions = state.competitionSessions.filter(s => isCompetitionSession(s) && dateOnly(s.sessionDate) >= state.today).map(s => ({ startDate: dateOnly(s.sessionDate), startTime: s.startTime || "", eventName: s.title || "三段跳競技" }));
   return [...fromEvents, ...fromSessions].sort((a, b) => dateOnly(a.startDate).localeCompare(dateOnly(b.startDate)))[0] || null;
 }
 

@@ -1,24 +1,14 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_97218f3248234c50b594cb01f0b07646",
-  "generatedAt": "2026-10-20T01:30:11.249Z",
-  "baseCommitSha": "854f75930f2635a693eebe967c8ec80b4cdbbeae",
-  "changeReason": "山下祐樹承認：サイト記録入力機能廃止、ChatGPT記録一元化、軽量進捗表示を反映",
+  "deploymentId": "SITEDEPLOY_ab84e99cb16c443b9fca2baf0589ab23",
+  "generatedAt": "2026-10-20T02:59:05.286Z",
+  "baseCommitSha": "e601972370ac0bd86a47b68243798e1a56e4393f",
+  "changeReason": "山下祐樹が2026-10-20 11:58 JSTに『上記2点を承認』と明示承認したAのView誤表示4点修正。承認前後のsource hash・9パッチ・687バイト増が同一と再確認。競技正本・他のsiteファイル・通信・依存・権限を変更しない。",
   "files": [
     {
       "path": "site/app.js",
       "operation": "UPSERT",
-      "contentHash": "d361227b965a58771d476aa304afc0eec02145a17a641dca2592a1f0752ab955"
-    },
-    {
-      "path": "site/styles.css",
-      "operation": "UPSERT",
-      "contentHash": "f46b413be270c804471015eb0b15f6298e9e44b83b52a5959fe2f57588035c2b"
-    },
-    {
-      "path": "site/ui-layout.json",
-      "operation": "UPSERT",
-      "contentHash": "55629ce8546d0f3b000c159b80255eedc5c83aadb77b504659ecc1c46f7d3b3e"
+      "contentHash": "2121d243e2d5e09a1fd8f59e7ccd1b46ba1f56d45f4275e304f98eaf58c62b46"
     }
   ]
 }
