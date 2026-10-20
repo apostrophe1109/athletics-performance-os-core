@@ -240,9 +240,29 @@ function renderDashboard({ motion = false } = {}) {
   commit();
 }
 
+
+function renderGoalProgress() {
+  const profile = state.profile || state.dayContext?.sportProfile || null;
+  const cycle = state.dayContext?.cycles?.[0] || null;
+  const session = state.dayContext?.sessions?.[0] || null;
+  const target = Number(profile?.targetValue);
+  const pb = Number(profile?.personalBest);
+  const wrap = element("section", "goal-progress");
+  wrap.append(element("strong", "goal-progress__title", "18m30への現在地"));
+  const values = element("div", "goal-progress__values");
+  const goalText = Number.isFinite(target) && target > 0 ? target.toFixed(2) + "m" : "未設定";
+  const bestText = Number.isFinite(pb) && pb > 0 ? pb.toFixed(2) + "m" : "未登録";
+  const gapText = Number.isFinite(target) && target > 0 && Number.isFinite(pb) && pb > 0 ? Math.max(0, target - pb).toFixed(2) + "m" : "算出不可";
+  values.append(metaItem("最終目標", goalText), metaItem("登録自己ベスト", bestText), metaItem("目標との差", gapText));
+  wrap.append(values);
+  const detail = element("p", "goal-progress__detail", "現在のCycle：" + (cycle?.cycleName || "未登録") + " ／ 今日の主適応：" + (session?.mainAdaptation || "未登録"));
+  wrap.append(detail);
+  return wrap;
+}
+
 function renderTrainingWorkspace() {
   const shell = element("section", "training-shell panel--wide");
-  shell.append(renderCompetitionStrip(), renderViewTabs());
+  shell.append(renderCompetitionStrip(), renderViewTabs(), renderGoalProgress());
 
   const content = element("div", "view-content");
   if (state.viewMode === "week") content.append(renderWeekView());
@@ -349,7 +369,6 @@ function renderDayView() {
     wrap.append(note);
   }
 
-  wrap.append(renderRecordEntry());
   return wrap;
 }
 
@@ -1267,288 +1286,6 @@ function sessionDoseText(session) {
     session.plannedWeightKg && `${session.plannedWeightKg}kg`,
     session.plannedRestSec && `休息${session.plannedRestSec}秒`
   ].filter(Boolean).join(" / ");
-}
-
-function renderRecordEntry() {
-  const box = element("section", "record-entry");
-  const heading = element("div", "record-entry__head");
-  heading.append(
-    element("div", "", ""),
-    element("span", "eyebrow", "EXECUTION LOG")
-  );
-  heading.firstChild.append(
-    element("h3", "", "今日の実施記録"),
-    element("p", "", "音声でも手入力でもOK。保存前に内容を確認します。")
-  );
-
-  const actions = element("div", "record-actions");
-  const voice = element("button", "record-button record-button--voice", "●  音声で記録");
-  const manual = element("button", "record-button record-button--manual", "✎  手入力で記録");
-  voice.type = manual.type = "button";
-  voice.addEventListener("click", () => openRecordDialog("voice"));
-  manual.addEventListener("click", () => openRecordDialog("manual"));
-  actions.append(voice, manual);
-  box.append(heading, actions);
-
-  const privacy = element("p", "record-entry__note", "入力内容は承認するまでGoogle Sheetsへ保存しません。音声そのものは保存対象にしません。");
-  box.append(privacy);
-  return box;
-}
-
-function openRecordDialog(mode) {
-  const dialog = element("dialog", "record-dialog");
-  const form = element("form", "record-dialog__card");
-  form.method = "dialog";
-
-  const top = element("div", "record-dialog__top");
-  const title = element("div");
-  title.append(
-    element("span", "eyebrow eyebrow--cyan", mode === "voice" ? "VOICE INPUT" : "MANUAL INPUT"),
-    element("h3", "", mode === "voice" ? "音声で実施記録" : "手入力で実施記録")
-  );
-  const close = element("button", "icon-button", "×");
-  close.type = "button";
-  close.setAttribute("aria-label", "閉じる");
-  close.addEventListener("click", () => dialog.close());
-  top.append(title, close);
-
-  const meta = element("div", "record-meta");
-  const primary = (state.dayContext?.sessions || [])[0];
-  meta.append(
-    metaItem("日付", formatJapaneseDate(state.selectedDate)),
-    metaItem("セッション", primary?.role || primary?.title || "—"),
-    metaItem("強度", intensityText(sessionIntensity(primary)))
-  );
-
-  let plannedMenu = null;
-  if (mode === "voice") {
-    plannedMenu = element("section", "record-planned-menu");
-    plannedMenu.setAttribute("aria-label", "本日の練習内容");
-
-    const plannedHead = element("div", "record-planned-menu__head");
-    plannedHead.append(
-      element("strong", "", "本日の練習内容"),
-      element("span", "", "見ながらそのまま音声入力できます")
-    );
-
-    const plannedList = element("ul", "record-planned-menu__list");
-    const context = state.dayContext || {};
-    const sessions = context.sessions || [];
-    const entries = dayMenuEntries(context, sessions);
-    if (entries.length) {
-      entries.forEach(item => plannedList.append(element("li", "", item.title)));
-    } else {
-      plannedList.append(element("li", "record-planned-menu__empty", "この日の詳細メニューは登録されていません。"));
-    }
-    plannedMenu.append(plannedHead, plannedList);
-  }
-
-  const transcript = element("textarea", "record-textarea");
-  transcript.rows = 9;
-  transcript.placeholder = mode === "voice"
-    ? "話し言葉のままでOK。種目、本数・距離・タイム・重量、良かった点、課題、痛み・張りなどを話すと、練習記録として整理します。"
-    : "例：ウォームアップはジョグ20分。バウンディング20mを2本。助走は良かったが、後半は少し脚が重かった。";
-  transcript.setAttribute("aria-label", "実施内容");
-
-  const voiceTools = element("div", "voice-tools");
-  let recognition = null;
-  let listening = false;
-  const voiceStatus = element("p", "voice-status", mode === "voice" ? "マイク開始ボタンを押してください。" : "");
-  if (mode === "voice") {
-    const mic = element("button", "mic-button", "●");
-    mic.type = "button";
-    const micLabel = element("span", "mic-label", "音声入力を開始");
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
-      mic.disabled = true;
-      micLabel.textContent = "このブラウザでは音声認識を利用できません。手入力をご利用ください。";
-    } else {
-      mic.addEventListener("click", () => {
-        if (listening) {
-          recognition?.stop();
-          return;
-        }
-        recognition = new Recognition();
-        recognition.lang = "ja-JP";
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        let finalText = transcript.value;
-        recognition.onstart = () => {
-          listening = true;
-          mic.dataset.listening = "true";
-          micLabel.textContent = "録音中…タップで停止";
-          voiceStatus.textContent = "話した内容をリアルタイムで文字にしています。";
-        };
-        recognition.onresult = event => {
-          let interim = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const value = event.results[i][0]?.transcript || "";
-            if (event.results[i].isFinal) finalText += `${value}。`;
-            else interim += value;
-          }
-          transcript.value = `${finalText}${interim}`;
-        };
-        recognition.onerror = event => {
-          voiceStatus.textContent = `音声認識を終了しました: ${event.error || "不明なエラー"}`;
-        };
-        recognition.onend = () => {
-          listening = false;
-          mic.dataset.listening = "false";
-          micLabel.textContent = "音声入力を再開";
-        };
-        recognition.start();
-      });
-    }
-    voiceTools.append(mic, micLabel, voiceStatus);
-  }
-
-  const organize = element("button", "organize-button", "練習記録に整理する");
-  organize.type = "button";
-  const preview = element("div", "draft-preview");
-  preview.hidden = true;
-  const save = element("button", "approve-button", "承認して保存");
-  save.type = "button";
-  save.disabled = true;
-  const systemNote = element("p", "draft-system-note", "");
-
-  organize.addEventListener("click", () => {
-    const value = transcript.value.trim();
-    if (!value) {
-      systemNote.textContent = "実施内容を入力してください。";
-      return;
-    }
-    const draft = summarizeTrainingRecord(value);
-    const sections = [
-      ["実施内容", draft.actions],
-      ["数値・結果", draft.records],
-      ["良かった点", draft.positives],
-      ["課題・改善点", draft.issues],
-      ["身体反応・コンディション", draft.condition]
-    ].filter(([, items]) => items.length);
-    preview.replaceChildren(
-      element("span", "eyebrow", "SAVE PREVIEW"),
-      element("h4", "", "練習記録として整理した内容"),
-      ...sections.map(([title, items]) => draftList(title, items))
-    );
-    preview.hidden = false;
-    systemNote.textContent = "話し言葉から事実だけを整理しています。原文にない内容は補いません。保存前に必ず確認してください。";
-    save.disabled = false;
-  });
-
-  save.addEventListener("click", () => {
-    systemNote.textContent = "現在のAPOS Viewは閲覧専用です。実データ保存はAPOS Coreの書込機能を追加し、Preview→承認→Apply→Verifyを通す実装後に有効化します。";
-  });
-
-  form.append(top, meta);
-  if (mode === "voice") form.append(plannedMenu, voiceTools);
-  form.append(transcript, organize, preview, save, systemNote);
-  dialog.append(form);
-  document.body.append(dialog);
-  dialog.addEventListener("close", () => {
-    try { recognition?.stop(); } catch {}
-    dialog.remove();
-  });
-  dialog.showModal();
-}
-
-function summarizeTrainingRecord(text) {
-  const chunks = segmentTrainingSpeech(text);
-  const actions = [];
-  const records = [];
-  const positives = [];
-  const issues = [];
-  const condition = [];
-
-  const positiveWords = /良かった|良い|よかった|できた|成功|安定|スムーズ|軽かった|速かった|余裕|狙いどおり|狙い通り|感覚が良/;
-  const issueWords = /課題|難しかった|できなかった|失敗|崩れ|崩れた|悪かった|合わなかった|遅かった|ばらつ|バラつ|詰まった|不足|改善|気になった/;
-  const conditionWords = /痛|張り|違和感|疲労|疲れ|重かった|重い|だる|硬い|攣|つり|腫れ|脚|足首|膝|腰|ハム|ふくらはぎ|アキレス|体調/;
-  const actionWords = /実施|やった|行った|走った|跳んだ|投げた|上げた|挙げた|ウォーム|ジョグ|流し|スプリント|ダッシュ|助走|踏切|跳躍|バウンディング|ポゴ|ドリル|スクワット|クリーン|デッドリフト|プレス|補強|ストレッチ|モビリティ|セット|本|回|kg|キロ|秒|分|cm|mm|m\b|％|%/i;
-
-  chunks.forEach(chunk => {
-    const value = normalizeSpokenTrainingText(chunk);
-    if (!value) return;
-
-    const isCondition = conditionWords.test(value);
-    const isPositive = positiveWords.test(value);
-    const isIssue = issueWords.test(value);
-    const isAction = actionWords.test(value) || hasTrainingMetric(value);
-    const record = extractTrainingRecord(value);
-
-    if (isAction) pushUnique(actions, value, 10);
-    if (record) pushUnique(records, record, 10);
-    if (isPositive) pushUnique(positives, value, 6);
-    if (isIssue) pushUnique(issues, value, 6);
-    if (isCondition) pushUnique(condition, value, 6);
-
-    if (!isAction && !isPositive && !isIssue && !isCondition) {
-      pushUnique(issues, value, 6);
-    }
-  });
-
-  if (!actions.length && chunks.length) {
-    chunks.slice(0, 8).forEach(chunk => pushUnique(actions, normalizeSpokenTrainingText(chunk), 8));
-  }
-
-  return { actions, records, positives, issues, condition };
-}
-
-function segmentTrainingSpeech(text) {
-  return String(text || "")
-    .replace(/\r/g, "\n")
-    .replace(/[！？!?]+/g, "。")
-    .replace(/\n+/g, "。")
-    .replace(/(?:^|。)\s*(?:それで|そのあと|あと|次に|最後に)[、,\s]*/g, "。")
-    .split(/。+/)
-    .map(value => value.trim())
-    .filter(Boolean);
-}
-
-function normalizeSpokenTrainingText(value) {
-  return String(value || "")
-    .trim()
-    .replace(/^(?:えーと|えっと|あの|その|なんか|まあ|えー|うーん)[、,\s]*/g, "")
-    .replace(/^(?:で|それで|あと|次に|最後に)[、,\s]+/g, "")
-    .replace(/[、,]\s*(?:えーと|えっと|あの|なんか|まあ)[、,\s]*/g, "、")
-    .replace(/(?:っていう感じ|という感じ|みたいな感じ)(?:です|でした)?$/g, "")
-    .replace(/\s+/g, " ")
-    .replace(/^[、,\s]+|[、,\s]+$/g, "")
-    .trim();
-}
-
-function hasTrainingMetric(value) {
-  return /\d+(?:\.\d+)?\s*(?:kg|キロ|km|m|cm|mm|秒|分|時間|本|回|セット|set|sets|rep|reps|％|%)/i.test(String(value || ""));
-}
-
-function extractTrainingRecord(value) {
-  const source = String(value || "");
-  const metricPattern = /\d+(?:\.\d+)?(?:\s*[〜~\-]\s*\d+(?:\.\d+)?)?\s*(?:kg|キロ|km|m|cm|mm|秒|分|時間|本|回|セット|set|sets|rep|reps|％|%)/gi;
-  const matches = [...source.matchAll(metricPattern)];
-  if (!matches.length) {
-    return /タイム|記録|ベスト|成功|失敗|クリア|RPE/i.test(source) ? source : "";
-  }
-  const metrics = [...new Set(matches.map(match => match[0].replace(/\s+/g, "")))];
-  const first = matches[0];
-  const prefix = source
-    .slice(0, first.index)
-    .replace(/[はをでがの：:\s、,]+$/g, "")
-    .trim();
-  const label = prefix && prefix.length <= 28 ? prefix : "";
-  return `${label ? `${label}：` : ""}${metrics.join(" / ")}`;
-}
-
-function pushUnique(list, value, limit) {
-  const normalized = String(value || "").trim();
-  if (!normalized || list.includes(normalized) || list.length >= limit) return;
-  list.push(normalized);
-}
-
-function draftList(title, items) {
-  const group = element("div", "draft-group");
-  group.append(element("strong", "", title));
-  const list = element("ul");
-  items.forEach(item => list.append(element("li", "", item)));
-  group.append(list);
-  return group;
 }
 
 function renderWeekView() {

@@ -263,21 +263,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .stop-note { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 11px 13px; border-left: 3px solid var(--danger); border-radius: 11px; color: var(--danger-soft); background: color-mix(in srgb, var(--danger) 6%, transparent); font-size: .76rem; line-height: 1.5; }
 .stop-note strong { color: var(--danger); }
 
-.record-entry {
-  margin-top: 3px;
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--accent-2) 24%, var(--line));
-  border-radius: 18px;
-  background: rgba(255,255,255,.025);
-}
-.record-entry__head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
-.record-entry h3 { margin: 0; font-size: 1.02rem; }
-.record-entry p { margin: 5px 0 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
-.record-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-top: 13px; }
-.record-button { min-height: 50px; border-radius: 14px; font-weight: 850; cursor: pointer; }
-.record-button--voice { color: #071017; border: 1px solid var(--accent); background: var(--accent); }
-.record-button--manual { color: var(--text); border: 1px solid var(--line); background: var(--surface-2); }
-.record-entry__note { margin-top: 10px !important; font-size: .68rem !important; }
+
+.goal-progress { margin: 12px 0; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); }
+.goal-progress__title { display: block; font-size: .85rem; margin-bottom: 8px; }
+.goal-progress__values { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.goal-progress__values .meta-item { min-width: 0; }
+.goal-progress__detail { color: var(--muted); margin: 9px 0 0; font-size: .72rem; line-height: 1.5; }
+@media (max-width: 420px) { .goal-progress__values { gap: 5px; } .goal-progress__values .meta-item { padding: 8px 4px; } .goal-progress__values .meta-item strong { font-size: .78rem; } }
 
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .section-head h2 { margin: 0; font-size: 1.08rem; }

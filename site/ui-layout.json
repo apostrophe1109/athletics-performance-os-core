@@ -21,9 +21,9 @@
     },
     "showNextCompetition": true,
     "recordEntry": {
-      "visible": true,
-      "voice": true,
-      "manual": true,
+      "visible": false,
+      "voice": false,
+      "manual": false,
       "requiresReviewBeforeSave": true,
       "storeRawAudio": false,
       "writeEnabled": false
