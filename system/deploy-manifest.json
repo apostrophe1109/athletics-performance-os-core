@@ -1,19 +1,19 @@
 {
   "system": "Athletics Performance OS",
-  "deploymentId": "SITEDEPLOY_70aad2adc7e743f48d197082f09c3f9b",
-  "generatedAt": "2026-10-19T20:11:32.367Z",
-  "baseCommitSha": "d00f75789856416655e1b89a7737998dbed4c56e",
-  "changeReason": "山下祐樹が2026-10-20の正式Preview提示後に『診断修正を承認』と明示承認した2ファイルのみを反映。診断誤READYの是正とWorker1.5.4の同期。競技データ・site/・権限・認証・Secret・安全機構は変更しない。",
+  "deploymentId": "SITEDEPLOY_1002bac23425450b94aafa919e5363d2",
+  "generatedAt": "2026-10-20T01:59:02.135Z",
+  "baseCommitSha": "c2ea3ef5e3f554cba2fff294f4484afb51d2eb54",
+  "changeReason": "2026-10-20山下祐樹が明示承認したAPOS重い書込みの小分け・Read-back運用規則を反映する",
   "files": [
-    {
-      "path": "system/worker.js",
-      "operation": "UPSERT",
-      "contentHash": "f2ec72b10090da85e36fedc42478bbf74366e56af18991b36c2c087725e9f06e"
-    },
     {
       "path": "system/runtime-policy.json",
       "operation": "UPSERT",
-      "contentHash": "bea00fe726dc741d030d98ec5786a96b2fd4cb4331369263f629a17ff6b6b44f"
+      "contentHash": "edd62f99a173bc742451e685bb3505df4ecb804e9078b022a3105e12f16d10a2"
+    },
+    {
+      "path": "system/plugin/athletics-performance-os/skills/apos-training-data/SKILL.md",
+      "operation": "UPSERT",
+      "contentHash": "7d9ab2df8df42fe57b4b756b4a99b7be6cc4da63a577e16d6237af99bbf2ec76"
     }
   ]
 }

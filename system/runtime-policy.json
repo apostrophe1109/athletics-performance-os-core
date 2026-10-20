@@ -52,7 +52,8 @@
     "gptActionRequestResponseMaxChars": 100000,
     "contextBudgetBytes": 60000,
     "sourceReadChunkChars": 30000,
-    "sourcePreviewMaxFiles": 8
+    "sourcePreviewMaxFiles": 8,
+    "preferredHeavyWriteBatchSize": 3
   },
   "notes": [
     "This runtime policy may refine maintenance behavior but may not weaken MyGPT base safety rules.",
@@ -60,6 +61,7 @@
     "WORKBOOK_STATUS must not be promoted to PRODUCTION_READY until all live acceptance tests pass.",
     "Exact non-destructive inline apply intent may satisfy user approval without a second confirmation turn; Preview still occurs before Apply.",
     "After technical failure or Preview expiry, an identical re-preview may continue the same user approval intent only after canonical re-read confirms identical semantic scope. A fresh internal approval envelope must use the latest approvalHash, a post-preview approvedAt, and a fresh nonce.",
+    "For slow Google Apps Script writes, prefer batches of 1-3 mutations and independently read back every completed chunk. A transport error does not prove the mutation failed; do not blindly retry. Keep the existing Core maximum and safety protections.",
     "Preview expiry remains an internal safety control and is normally not presented to the user.",
     "APOS Plugin migration runs in parallel with the existing Custom GPT. Do not migrate the production GPT until MCP OAuth, tool scans, golden prompts, write safety, View deployment verification, rollback, backup, and maintenance acceptance tests all pass.",
     "Plugin Skills, ChatGPT-native UI, Voice workflows, Work monitoring, and Health integration must remain isolated from the GitHub Pages site bundle by default. They must not add JavaScript, CSS, assets, or extra network calls to site/ unless a separate site-performance Preview explicitly demonstrates the need and acceptable impact.",
